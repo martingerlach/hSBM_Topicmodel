@@ -277,9 +277,9 @@ if __name__=='__main__':
     parser.add_argument("-s", "--state",help="Filename to existing inferred graph (if None, do inference again)",default=None,type=str)
     parser.add_argument("-c", "--corpus",help="Filename to corpus text",default='corpus.txt',type=str)
     parser.add_argument("-t", "--titles",help="Filename to titles of texts (will be added as node-properties - if file does not exist: indexed with integers starting from 0)",default='titles.txt',type=str)
-    parser.add_argument("-d", "--draw",help="Whether to draw the hierarchy of the inferred network (default=0/no)",default=0,type=int)
+    parser.add_argument("-d", "--draw",help="Whether to draw the hierarchy of the inferred network (default=1/yes)",default=1,type=int)
     parser.add_argument("-p", "--pedges",help="Fraction of edges to include when drawing the hierarchy (only has an effect if --draw==1",default=0.01,type=float)
-    parser.add_argument("-r", "--remove",help="Delete output-folder (get rid of old result), default=0",default=0,type=int)
+    # parser.add_argument("-r", "--remove",help="Delete output-folder (get rid of old result), default=1/yes",default=1,type=int)
 
     args = parser.parse_args()
 
