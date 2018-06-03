@@ -189,7 +189,7 @@ def get_groups(state,g,l=0):
     p_w_tw = n_wb/np.sum(n_wb,axis=0)[np.newaxis,:]
 
     ## Mixture of word-groups into documetns P(t_w | d)
-    p_tw_d = (n_dbw/np.sum(n_dbw,axis=0)[np.newaxis,:]).T
+    p_tw_d = (n_dbw/np.sum(n_dbw,axis=1)[:,np.newaxis]).T
 
 
     result = {}
