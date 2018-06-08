@@ -10,34 +10,21 @@ Optionally, we can provide a file with titles for the documents in titles.txt
 
 ## Setup
 
-#### Installing graph-tool
+#### Install graph-tool
 
-We use the [graph-tool](https://graph-tool.skewed.de/) package for finding topical structure in the word-document networks. 
-See the [installation-instructions](https://git.skewed.de/count0/graph-tool/wikis/installation-instructions), where you will find packages for linux, etc.
+We use the [graph-tool](https://graph-tool.skewed.de/) package for finding topical structure in the word-document networks.
+- see the [installation-instructions](https://git.skewed.de/count0/graph-tool/wikis/installation-instructions), where you will find packages for linux, etc.
+- an alternative for linux is to install via a conda-environment, see [here](https://gitlab.com/ostrokach-forge/graph-tool)
 
-Another option, which worked for me is to use conda virtual environments:
+#### Get Jupyter notebook
 
-- Install anaconda, see e.g. [here](https://www.digitalocean.com/community/tutorials/how-to-install-the-anaconda-python-distribution-on-ubuntu-16-04)
+In order to execture the tutorial-notebook, install [jupyter](http://jupyter.org/), e.g.
 
-- Create a conda-environment called "gt-test" and install graph-tool. The instructions follow the approach outlined [here](https://gitlab.com/ostrokach-forge/graph-tool)
+`pip install jupyter`
 
-`conda create -n gt-test -c ostrokach-forge -c conda-forge -c defaults --override-channels "python=3.6" graph-tool`
+#### Get hSBM-TopicModel repository
 
-- in order to enable plotting functionality functions we also have to install this:
-
-`conda install -n gt-test -c pkgw-forge gtk3`
-
-- activate the new environment
-
-`source activate gt-test`
-
-- in order to use jupyter notebook, we have to install jupyter into the environment and link the environment as a separate kernel
-
-`conda install jupyter`
-
-`python -m ipykernel install --user --name gt-test --display-name "gt-test"`
-
-#### Download the hSBM-TopicModel repo
+In order to do topic modeling with stochastic block models we need to get the code from the repositroy:
 
 `git clone https://github.com/martingerlach/hSBM_Topicmodel.git`
 
@@ -48,5 +35,18 @@ Start jupyter notebooks
 `jupter notebook`
 
 then select the 'hsbm-topicmodel-tutorial'-notebook.
+
+It will guide you through the different steps to do topic modeling with stochastic block models:
+
+- How to construct the word-document network from a corpus of text
+
+- How to fit the stochastic block model to the word-document network
+
+- How to extract the topics from the fitted model, e.g.
+	- the most important words for each topic
+	- the clustering of documents
+	- the topic mixtures for each document
+
+- How to visualize the topical structure, in particular the hierarchy of topics
 
 
