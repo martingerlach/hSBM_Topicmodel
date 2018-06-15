@@ -34,7 +34,7 @@ Start jupyter notebooks
 
 `jupter notebook`
 
-then select the 'hsbm-topicmodel-tutorial'-notebook.
+then select the 'TopSBM-tutorial'-notebook.
 
 It will guide you through the different steps to do topic modeling with stochastic block models:
 
