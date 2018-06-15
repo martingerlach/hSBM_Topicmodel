@@ -5,322 +5,333 @@ from collections import Counter,defaultdict
 import pickle
 import graph_tool.all as gt
 
-def make_graph(list_texts, documents = None):
-    """Transform a corpus into a bipartite word-document network with D docs and V word-(types)
-        and N word-tokens.
-       The corpus is in the following format:
-       - or a list of documents where each doc is a list of tokens 
-
-       Returns a graph-tool graph-instance with nodes and edges:
-       - nodes 0,...,D-1 correspond to the document nodes 
-       - nodes D,...,V+D-1 correspond to the word-nodes
-       - we have N edges, where an edge corresponds to a word-token 
-       (occurrence of a word-type in a document)
-
-       We define vertex-properties
-       - 'name': 
-            - for docs the document titles (supplied in a separate file from args.titles)
-              if n.a. we index from 0,...,D-1
-            - for words it is the string of the word-type
-        - 'kind': doc-nodes:0; word-nodes:1
-
-
-    """
-
-    D = len(list_texts)
-
-    ## if there are no document titles, we assign integers 0,...,D-1
-    ## otherwise we use supplied titles
-    if documents == None:
-        list_titles = [str(h) for h in range(D)]
-    else:
-        list_titles = documents
-
-    ## make a graph
-    ## create a graph
-    g = gt.Graph(directed=False)
-    ## define node properties
-    ## name: docs - title, words - 'word'
-    ## kind: docs - 0, words - 1
-    name = g.vp["name"] = g.new_vertex_property("string")
-    kind = g.vp["kind"] = g.new_vertex_property("int")  
-
-    docs_add = defaultdict(lambda: g.add_vertex())
-    words_add = defaultdict(lambda: g.add_vertex())
-
-    ## add all documents first
-    for i_d in range(D):
-        title = list_titles[i_d]
-        d=docs_add[title]
-
-    ## add all documents and words as nodes
-    ## add all tokens as links
-    for i_d in range(D):
-        title = list_titles[i_d]
-        text = list_texts[i_d]
-        
-        d=docs_add[title]
-        name[d] = title
-        kind[d] = 0
-        c=Counter(text)
-        for word,count in c.items():
-            w=words_add[word]
-            name[w] = word
-            kind[w] = 1
-            for n in range(count):
-                g.add_edge(d,w)
-
-    return g
-
-
-def sbm_fit(g,overlap=False,hierarchical=True):
+class sbmtm():
     '''
-    Infer the block structure of the bipartite word-document network.
-    Default: a hierarchical, nonoverlapping blockmodel.
-    IN:
-    - g, graph, see make_graph
-    OUT:
-    - ???
+    Class for topic-modeling with sbm's.
     '''
-    ## vertex property map to ensure that words and documents are not clustered together
-    clabel = g.vp['kind']
 
-    ## the inference
-    state=gt.minimize_nested_blockmodel_dl(g,deg_corr=True,overlap=False,\
-                                       state_args={'clabel':clabel,'pclabel':clabel})
-    
-    ## collect all the results in a dictionary.
-    result = {}
-    result['state'] = state
-    result['mdl'] = state.entropy()
+    def __init__(self):
+        self.g = None ## network
+
+        self.words = [] ## list of word nodes
+        self.documents = [] ## list of document nodes
+
+        self.state = None ## inference state from graphtool
+        self.groups = {} ## results of group membership from inference
+        self.mdl = np.nan ## minimum description length of inferred state
+        self.L = np.nan ## number of levels in hierarchy
+
+    def make_graph(self,list_texts, documents = None):
+        '''
+        Load a corpus and generate the word-document network
+        '''
+        D = len(list_texts)
+
+        ## if there are no document titles, we assign integers 0,...,D-1
+        ## otherwise we use supplied titles
+        if documents == None:
+            list_titles = [str(h) for h in range(D)]
+        else:
+            list_titles = documents
+
+        ## make a graph
+        ## create a graph
+        g = gt.Graph(directed=False)
+        ## define node properties
+        ## name: docs - title, words - 'word'
+        ## kind: docs - 0, words - 1
+        name = g.vp["name"] = g.new_vertex_property("string")
+        kind = g.vp["kind"] = g.new_vertex_property("int")  
+
+        docs_add = defaultdict(lambda: g.add_vertex())
+        words_add = defaultdict(lambda: g.add_vertex())
+
+        ## add all documents first
+        for i_d in range(D):
+            title = list_titles[i_d]
+            d=docs_add[title]
+
+        ## add all documents and words as nodes
+        ## add all tokens as links
+        for i_d in range(D):
+            title = list_titles[i_d]
+            text = list_texts[i_d]
+            
+            d=docs_add[title]
+            name[d] = title
+            kind[d] = 0
+            c=Counter(text)
+            for word,count in c.items():
+                w=words_add[word]
+                name[w] = word
+                kind[w] = 1
+                for n in range(count):
+                    g.add_edge(d,w)
+        self.g = g
+        self.words = [ g.vp['name'][v] for v in  g.vertices() if g.vp['kind'][v]==1   ]
+        self.documents = [ g.vp['name'][v] for v in  g.vertices() if g.vp['kind'][v]==0   ]
+
+    def save_graph(self,filename = 'graph.xml.gz'):
+        '''
+        Save the word-document network generated by make_graph() as filename.
+        Allows for loading the graph without calling make_graph().
+        '''
+        self.g.save(filename)
+
+    def load_graph(self,filename = 'graph.xml.gz'):
+        '''
+        Load a word-document network generated by make_graph() and saved with save_graph().
+        '''
+        self.g = gt.load_graph(filename)
+        self.words = [ self.g.vp['name'][v] for v in  self.g.vertices() if self.g.vp['kind'][v]==1   ]
+        self.documents = [ self.g.vp['name'][v] for v in  self.g.vertices() if self.g.vp['kind'][v]==0   ]
 
 
-    ## keep the list of words and documents
-    words = [ g.vp['name'][v] for v in  g.vertices() if g.vp['kind'][v]==1   ]
-    docs = [ g.vp['name'][v] for v in  g.vertices() if g.vp['kind'][v]==0   ]
-    result['words'] = words
-    result['docs'] = docs
+    def fit(self,overlap = False, hierarchical = True):
+        '''
+        Fit the sbm to the word-document network.
+        - overlap, bool (default: False). Overlapping or Non-overlapping groups. 
+            Overlapping not implemented yet
+        - hierarchical, bool (default: True). Hierarchical SBM or Flat SBM.
+            Flat SBM not implemented yet.
+        '''
+        g = self.g
+        if g == None:
+            print('No data to fit the SBM. Load some data first (make_graph)')
+        else:
 
-    V = get_V(g)
-    D = get_D(g)
-    N = get_N(g)
-    result['V'] = V
-    result['D'] = D
-    result['N'] = N
+            
+            clabel = g.vp['kind']
 
-    ## get the group membership statistics
-    L = len(state.levels)
-    result['L'] = L
+            ## the inference
+            state = gt.minimize_nested_blockmodel_dl(g,deg_corr=True,overlap=False,\
+                                               state_args={'clabel':clabel,'pclabel':clabel})
+            
+            self.state = state
+            ## minimum description length
+            self.mdl = state.entropy()
+            ## collect group membership for each level in the hierarchy
+            L = len(state.levels)
+            dict_groups_L = {}
 
-    dict_stats_groups = {}
-    ## for each level in the hierchy we make a dictionary with the node-group statistics
-    ## e.g. group-membership
-    ## we omit the highest level in the hierarchy as there will be no more distinction between
-    ## word- and doc-groups
-    for l in range(L-1):
-        dict_stats_groups_l = get_groups(state,g,l=l)
-        dict_stats_groups[l] = dict_stats_groups_l
-    result['stats_groups'] = dict_stats_groups
-    return result
+            ## only trivial bipartite structure
+            if L == 2:
+                self.L = 1
+                for l in range(L-1):
+                    dict_groups_l = self.get_groups(l=l)
+                    dict_groups_L[l] = dict_groups_l
+            ## omit trivial levels: l=L-1 (single group), l=L-2 (bipartite)
+            else:
+                self.L = L-2
+                for l in range(L-2):
+                    dict_groups_l = self.get_groups(l=l)
+                    dict_groups_L[l] = dict_groups_l               
+            self.groups = dict_groups_L
+
+    def plot(self, filename = None,nedges = 1000):
+        '''
+        Plot the graph and group structure.
+        optional: 
+        - filename, str; where to save the plot. if None, will not be saved
+        - nedges, int; subsample  to plot (faster, less memory)
+        '''
+        _ = gt.draw_hierarchy(self.state,layout='bipartite',\
+                  output=filename,\
+                  subsample_edges=nedges,\
+                  hshortcuts=1, hide=0,\
+                  )
 
 
-## get group-topic statistics
-def get_groups(state,g,l=0):
-    '''
-    extract statistics on group membership of nodes form the inferred state.
-    return dictionary
-    - B_d, int, number of doc-groups
-    - B_w, int, number of word-groups
-    - p_tw_w, array B_w x V; word-group-membership:
-         prob that word-node w belongs to word-group tw: P(tw | w) 
-    - p_td_d, array B_d x D; doc-group membership:
-         prob that doc-node d belongs to doc-group td: P(td | d)
-    - p_w_tw, array V x B_w; topic distribution:
-         prob of word w given topic tw P(w | tw)
-    - p_tw_d, array B_w x d; doc-topic mixtures:
-         prob of word-group tw in doc d P(tw | d)
-    '''
-    V = get_V(g)
-    D = get_D(g)
-    N = get_N(g)
-    ## if we have a nested state: project to a level, otherwise take state as is
-    if isinstance(state,(gt.BlockState,gt.OverlapBlockState)):
-        state_l = state.copy(overlap=True)
-    else:
+    def topics(self, l=0, n=10):
+        '''
+        get the n most common words for each word-group in level l.
+        return tuples (word,P(w|tw))
+        '''
+        dict_groups = self.groups[l]
+        Bw = dict_groups['Bw']
+        p_w_tw = dict_groups['p_w_tw']
+
+        words = self.words
+
+        ## loop over all word-groups
+        dict_group_words = {}
+        for tw in range(Bw):
+            p_w_ = p_w_tw[:,tw]
+            ind_w_ = np.argsort(p_w_)[::-1]
+            list_words_tw = []
+            for i in ind_w_[:n]:
+                if p_w_[i] > 0:
+                    list_words_tw+=[(words[i],p_w_[i])]
+                else:
+                    break
+            dict_group_words[tw] = list_words_tw
+        return dict_group_words
+
+    def topicdist(self, doc_index, l=0):
+        dict_groups =  self.groups[l]
+        p_tw_d = dict_groups['p_tw_d']
+        list_topics_tw = []
+        for tw,p_tw in enumerate(p_tw_d[:,doc_index]):
+                list_topics_tw += [(tw,p_tw)]
+        return list_topics_tw
+
+    def clusters(self,l=0,n=10):
+        '''
+        Get n 'most common' documents from each document cluster.
+        most common refers to largest contribution in group membership vector.
+        For the non-overlapping case, each document belongs to one and only one group with prob 1.
+
+        '''
+        dict_groups = self.groups[l]
+        Bd = dict_groups['Bd']
+        p_td_d = dict_groups['p_td_d']
+
+        docs = self.documents
+        ## loop over all word-groups
+        dict_group_docs = {}
+        for td in range(Bd):
+            p_d_ = p_td_d[td,:]
+            ind_d_ = np.argsort(p_d_)[::-1]
+            list_docs_td = []
+            for i in ind_d_[:n]:
+                if p_d_[i] > 0:
+                    list_docs_td+=[(docs[i],p_d_[i])]
+                else:
+                    break
+            dict_group_docs[td] = list_docs_td
+        return dict_group_docs
+
+    def clusters_query(self,doc_index,l=0):
+        '''
+        Get all documents in the same group as the query-document.
+        Note: Works only for non-overlapping model. 
+        For overlapping case, we need something else.
+        '''
+        dict_groups = self.groups[l]
+        Bd = dict_groups['Bd']
+        p_td_d = dict_groups['p_td_d']
+
+        documents = self.documents
+        ## loop over all word-groups
+        dict_group_docs = {}
+        td = np.argmax(p_td_d[:,doc_index])
+
+        list_doc_index_sel = np.where(p_td_d[td,:]==1)[0]
+
+        list_doc_query = []
+
+        for doc_index_sel in list_doc_index_sel:
+            if doc_index != doc_index_sel:
+                list_doc_query += [(doc_index_sel,documents[doc_index_sel])]
+
+        return list_doc_query
+
+
+    def group_membership(self,l=0):
+        '''
+        Return the group-membership vectors for 
+            - document-nodes, p_td_d, array with shape Bd x D
+            - word-nodes, p_tw_w, array with shape Bw x V
+        It gives the probability of a nodes belonging to one of the groups.
+        '''
+        dict_groups = self.groups[l]
+        p_tw_w = dict_groups['p_tw_w']
+        p_td_d = dict_groups['p_td_d']
+        return p_td_d,p_tw_w
+
+    ###########
+    ########### HELPER FUNCTIONS
+    ###########
+    ## get group-topic statistics
+    def get_groups(self,l=0):
+        '''
+        extract statistics on group membership of nodes form the inferred state.
+        return dictionary
+        - B_d, int, number of doc-groups
+        - B_w, int, number of word-groups
+        - p_tw_w, array B_w x V; word-group-membership:
+             prob that word-node w belongs to word-group tw: P(tw | w) 
+        - p_td_d, array B_d x D; doc-group membership:
+             prob that doc-node d belongs to doc-group td: P(td | d)
+        - p_w_tw, array V x B_w; topic distribution:
+             prob of word w given topic tw P(w | tw)
+        - p_tw_d, array B_w x d; doc-topic mixtures:
+             prob of word-group tw in doc d P(tw | d)
+        '''
+        V = self.get_V()
+        D = self.get_D()
+        N = self.get_N()
+
+        g = self.g
+        state = self.state
         state_l = state.project_level(l).copy(overlap=True)
+        state_l_edges = state_l.get_edge_blocks() ## labeled half-edges
 
-    state_l_edges = state_l.get_edge_blocks() ## labeled half-edges
+        ## count labeled half-edges, group-memberships
+        B = state_l.B
+        n_wb = np.zeros((V,B)) ## number of half-edges incident on word-node w and labeled as word-group tw
+        n_db = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as document-group td
+        n_dbw = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as word-group td
 
-    ## count labeled half-edges, group-memberships
-    B = state_l.B
-    n_wb = np.zeros((V,B)) ## number of half-edges incident on word-node w and labeled as word-group tw
-    n_db = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as document-group td
-    n_dbw = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as word-group td
+        for e in g.edges():
+            z1,z2 = state_l_edges[e]
+            v1 = e.source()
+            v2 = e.target()
+            n_db[int(v1),z1] += 1
+            n_dbw[int(v1),z2] += 1
+            n_wb[int(v2)-D,z2] += 1
 
-    for e in g.edges():
-        z1,z2 = state_l_edges[e]
-        v1 = e.source()
-        v2 = e.target()
-        n_db[int(v1),z1] += 1
-        n_dbw[int(v1),z2] += 1
-        n_wb[int(v2)-D,z2] += 1
+        p_w = np.sum(n_wb,axis=1)/float(np.sum(n_wb))
 
-    p_w = np.sum(n_wb,axis=1)/float(np.sum(n_wb))
+        ind_d = np.where(np.sum(n_db,axis=0)>0)[0]
+        Bd = len(ind_d)
+        n_db = n_db[:,ind_d]
 
-    ind_d = np.where(np.sum(n_db,axis=0)>0)[0]
-    Bd = len(ind_d)
-    n_db = n_db[:,ind_d]
+        ind_w = np.where(np.sum(n_wb,axis=0)>0)[0]
+        Bw = len(ind_w)
+        n_wb = n_wb[:,ind_w]
 
-    ind_w = np.where(np.sum(n_wb,axis=0)>0)[0]
-    Bw = len(ind_w)
-    n_wb = n_wb[:,ind_w]
+        ind_w2 = np.where(np.sum(n_dbw,axis=0)>0)[0]
+        n_dbw = n_dbw[:,ind_w2]
 
-    ind_w2 = np.where(np.sum(n_dbw,axis=0)>0)[0]
-    n_dbw = n_dbw[:,ind_w2]
+        ## group-membership distributions
+        # group membership of each word-node P(t_w | w)
+        p_tw_w = (n_wb/np.sum(n_wb,axis=1)[:,np.newaxis]).T
 
-    ## group-membership distributions
-    # group membership of each word-node P(t_w | w)
-    p_tw_w = (n_wb/np.sum(n_wb,axis=1)[:,np.newaxis]).T
+        # group membership of each doc-node P(t_d | d)
+        p_td_d = (n_db/np.sum(n_db,axis=1)[:,np.newaxis]).T
 
-    # group membership of each doc-node P(t_d | d)
-    p_td_d = (n_db/np.sum(n_db,axis=1)[:,np.newaxis]).T
+        ## topic-distribution for words P(w | t_w)
+        p_w_tw = n_wb/np.sum(n_wb,axis=0)[np.newaxis,:]
 
-    ## topic-distribution for words P(w | t_w)
-    p_w_tw = n_wb/np.sum(n_wb,axis=0)[np.newaxis,:]
-
-    ## Mixture of word-groups into documetns P(t_w | d)
-    p_tw_d = (n_dbw/np.sum(n_dbw,axis=1)[:,np.newaxis]).T
-
-
-    result = {}
-    result['Bd'] = Bd
-    result['Bw'] = Bw
-    result['p_tw_w'] = p_tw_w
-    result['p_td_d'] = p_td_d
-    result['p_w_tw'] = p_w_tw 
-    result['p_tw_d'] = p_tw_d
-
-    return result
+        ## Mixture of word-groups into documetns P(t_w | d)
+        p_tw_d = (n_dbw/np.sum(n_dbw,axis=1)[:,np.newaxis]).T
 
 
-### functions handling the results-dictionary
+        result = {}
+        result['Bd'] = Bd
+        result['Bw'] = Bw
+        result['p_tw_w'] = p_tw_w
+        result['p_td_d'] = p_td_d
+        result['p_w_tw'] = p_w_tw 
+        result['p_tw_d'] = p_tw_d
 
-def sbm_plot(dict_result, pedges = 0.05,filename_save = None):
-    '''
-    Plot the graph and group structure.
-    optional: 
-    - pedges, float; subsample fraction of edges to plot (faster, less memory)
-    - filename_save, str; where to save the plot. if None, will not be saved
-    '''
-    N = dict_result['N']
-    state = dict_result['state']
-    _ = gt.draw_hierarchy(state,layout='bipartite',\
-              output=filename_save,\
-              subsample_edges=int(pedges*N),\
-              hshortcuts=1, hide=0,\
-              )
+        return result
 
-def get_Bwd(dict_result,l):
-    '''
-    Return the number of document and word groups on a given level
-    '''
-    dict_groups = dict_result['stats_groups'][l]
-    return dict_groups['Bd'], dict_groups['Bw']
+    ### helper functions
 
-def most_common_words(dict_result,l,n=10):
-    '''
-    get the n most common words for each word-group in level l.
-    return tuples (word,P(w|tw))
-    '''
-    dict_groups = dict_result['stats_groups'][l]
-    Bw = dict_groups['Bw']
-    p_w_tw = dict_groups['p_w_tw']
-
-    words = dict_result['words']
-
-    ## loop over all word-groups
-    dict_group_words = {}
-    for tw in range(Bw):
-        p_w_ = p_w_tw[:,tw]
-        ind_w_ = np.argsort(p_w_)[::-1]
-        list_words_tw = []
-        for i in ind_w_[:n]:
-            if p_w_[i] > 0:
-                list_words_tw+=[(words[i],p_w_[i])]
-            else:
-                break
-        dict_group_words[tw] = list_words_tw
-    return dict_group_words
-
-def most_common_docs(dict_result,l,n=10):
-    '''
-    Return n 'most common' documents for each doc-group td,
-    i.e. they have the largest value in p(td | d)
-    '''
-    dict_groups = dict_result['stats_groups'][l]
-    Bd = dict_groups['Bd']
-    p_td_d = dict_groups['p_td_d']
-
-    docs = dict_result['docs']
-
-    ## loop over all word-groups
-    dict_group_docs = {}
-    for td in range(Bd):
-        p_d_ = p_td_d[td,:]
-        ind_d_ = np.argsort(p_d_)[::-1]
-        list_docs_td = []
-        for i in ind_d_[:n]:
-            if p_d_[i] > 0:
-                list_docs_td+=[(docs[i],p_d_[i])]
-            else:
-                break
-        dict_group_docs[td] = list_docs_td
-    return dict_group_docs
-
-def sbm_topicdist_w(dict_result,l):
-    dict_groups = dict_result['stats_groups'][l]
-    p_w_tw = dict_groups['p_w_tw']
-    return p_w_tw
-
-def sbm_topicdist_d(dict_result,l):
-    dict_groups = dict_result['stats_groups'][l]
-    p_tw_d = dict_groups['p_tw_d']
-    return p_tw_d
-
-def sbm_group_membership(dict_result,l):
-    dict_groups = dict_result['stats_groups'][l]
-    p_tw_w = dict_groups['p_tw_w']
-    p_td_d = dict_groups['p_td_d']
-    return p_td_d,p_tw_w
-
-
-
-
-### helper functions
-
-def get_V(g):
-    '''
-    return number of word-nodes == types
-    '''
-    return int(np.sum(g.vp['kind'].a==1)) # no. of types
-def get_D(g):
-    '''
-    return number of doc-nodes == number of documents
-    '''
-    return int(np.sum(g.vp['kind'].a==0)) # no. of types
-def get_N(g):
-    '''
-    return number of edges == tokens
-    '''
-    return int(g.num_edges()) # no. of types
-
-
-### functions for reading corpora
-def read_corpus(filename):
-    '''We assume that each line is a document and all words are separated by blank space.
-        we return a list of documents, where each document is a list of strings (the word-tokens)
-    '''
-    with open(filename,'r') as f:
-        x=f.readlines()
-    texts = [h.split() for h in x]
-    return texts
+    def get_V(self):
+        '''
+        return number of word-nodes == types
+        '''
+        return int(np.sum(self.g.vp['kind'].a==1)) # no. of types
+    def get_D(self):
+        '''
+        return number of doc-nodes == number of documents
+        '''
+        return int(np.sum(self.g.vp['kind'].a==0)) # no. of types
+    def get_N(self):
+        '''
+        return number of edges == tokens
+        '''
+        return int(self.g.num_edges()) # no. of types
