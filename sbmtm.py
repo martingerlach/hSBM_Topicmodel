@@ -5,6 +5,8 @@ from collections import Counter,defaultdict
 import pickle
 import graph_tool.all as gt
 
+import pandas as pd
+
 class sbmtm():
     '''
     Class for topic-modeling with sbm's.
@@ -98,9 +100,7 @@ class sbmtm():
         g = self.g
         if g == None:
             print('No data to fit the SBM. Load some data first (make_graph)')
-        else:
-
-            
+        else:            
             clabel = g.vp['kind']
 
             ## the inference
@@ -238,6 +238,88 @@ class sbmtm():
         p_tw_w = dict_groups['p_tw_w']
         p_td_d = dict_groups['p_td_d']
         return p_td_d,p_tw_w
+
+
+    def print_topics(self,l=0,format='csv',path_save = ''):
+        '''
+        Print topics, topic-distributions, and document clusters for a given level in the hierarchy.
+        format: csv (default) or html
+        '''
+        V=self.get_V()
+        D=self.get_D()
+
+        ## topics      
+        dict_topics = self.topics(l=l,n=-1)
+
+        list_topics = sorted(list(dict_topics.keys()))
+        list_columns = ['Topic %s'%(t+1) for t in list_topics]
+        
+        T = len(list_topics)
+        df = pd.DataFrame(columns = list_columns,index=range(V))
+
+        
+        for t in list_topics:
+            list_w = [h[0] for h in dict_topics[t]]
+            V_t = len(list_w)
+            df.iloc[:V_t,t] = list_w
+        df=df.dropna(how='all',axis=0)
+        if format == 'csv':
+            fname_save = 'topsbm_level_%s_topics.csv'%(l)
+            filename = os.path.join(path_save,fname_save)
+            df.to_csv(filename,index=False,na_rep='')
+        elif format == 'html':
+            fname_save = 'topsbm_level_%s_topics.html'%(l)
+            filename = os.path.join(path_save,fname_save)
+            df.to_html(filename,index=False,na_rep='')
+        else:
+            pass
+        
+        ## topic distributions
+        list_columns = ['i_doc','doc']+['Topic %s'%(t+1) for t in list_topics]
+        df = pd.DataFrame(columns=list_columns,index=range(D))
+        for i_doc in range(D):
+            list_topicdist = self.topicdist(i_doc,l=l)
+            df.iloc[i_doc,0] = i_doc
+            df.iloc[i_doc,1] = self.documents[i_doc]
+            df.iloc[i_doc,2:] = [h[1] for h in list_topicdist]
+        df=df.dropna(how='all',axis=1)
+        if format == 'csv':
+            fname_save = 'topsbm_level_%s_topic-dist.csv'%(l)
+            filename = os.path.join(path_save,fname_save)
+            df.to_csv(filename,index=False,na_rep='')
+        elif format == 'html':
+            fname_save = 'topsbm_level_%s_topic-dist.html'%(l)
+            filename = os.path.join(path_save,fname_save)
+            df.to_html(filename,index=False,na_rep='')
+        else:
+            pass
+        
+        ## doc-groups
+        
+        dict_clusters = self.clusters(l=l,n=-1)
+
+        list_clusters = sorted(list(dict_clusters.keys()))
+        list_columns = ['Cluster %s'%(t+1) for t in list_clusters]
+        
+        T = len(list_clusters)
+        df = pd.DataFrame(columns = list_columns,index=range(D))
+
+        
+        for t in list_clusters:
+            list_d = [h[0] for h in dict_clusters[t]]
+            D_t = len(list_d)
+            df.iloc[:D_t,t] = list_d
+        df=df.dropna(how='all',axis=0)
+        if format == 'csv':
+            fname_save = 'topsbm_level_%s_clusters.csv'%(l)
+            filename = os.path.join(path_save,fname_save)
+            df.to_csv(filename,index=False,na_rep='')
+        elif format == 'html':
+            fname_save = 'topsbm_level_%s_clusters.html'%(l)
+            filename = os.path.join(path_save,fname_save)
+            df.to_html(filename,index=False,na_rep='')
+        else:
+            pass
 
     ###########
     ########### HELPER FUNCTIONS
