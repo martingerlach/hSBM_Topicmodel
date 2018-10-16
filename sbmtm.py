@@ -23,9 +23,14 @@ class sbmtm():
         self.mdl = np.nan ## minimum description length of inferred state
         self.L = np.nan ## number of levels in hierarchy
 
-    def make_graph(self,list_texts, documents = None, counts=True):
+    def make_graph(self,list_texts, documents = None, counts=True, n_min = None):
         '''
         Load a corpus and generate the word-document network
+
+        optional arguments:
+        - documents: list of str, titles of documents
+        - counts: save edge-multiplicity as counts (default: True)
+        - n_min, int: filter all word-nodes with less than n_min counts (default None)
         '''
         D = len(list_texts)
 
@@ -75,6 +80,24 @@ class sbmtm():
                 else:
                     for n in range(count):
                         g.add_edge(d,w)
+
+        ## filter word-types with less than n_min counts
+        if n_min is not None:
+            v_n = g.new_vertex_property("int")
+            for v in g.vertices():
+                v_n[v] = v.out_degree()
+
+            v_filter =  g.new_vertex_property("bool")
+            for v in g.vertices():
+                if v_n[v] < n_min and g.vp['kind'][v]==1:
+                    v_filter[v] = False
+                else:
+                    v_filter[v] = True    
+        g.set_vertex_filter(v_filter)
+        g.purge_vertices()
+        g.clear_filters()
+
+
         self.g = g
         self.words = [ g.vp['name'][v] for v in  g.vertices() if g.vp['kind'][v]==1   ]
         self.documents = [ g.vp['name'][v] for v in  g.vertices() if g.vp['kind'][v]==0   ]
