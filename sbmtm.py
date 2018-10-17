@@ -93,9 +93,9 @@ class sbmtm():
                     v_filter[v] = False
                 else:
                     v_filter[v] = True    
-        g.set_vertex_filter(v_filter)
-        g.purge_vertices()
-        g.clear_filters()
+            g.set_vertex_filter(v_filter)
+            g.purge_vertices()
+            g.clear_filters()
 
 
         self.g = g
