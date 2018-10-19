@@ -118,13 +118,15 @@ class sbmtm():
         self.documents = [ self.g.vp['name'][v] for v in  self.g.vertices() if self.g.vp['kind'][v]==0   ]
 
 
-    def fit(self,overlap = False, hierarchical = True):
+    def fit(self,overlap = False, hierarchical = True, B_min = None, n_init = 1):
         '''
         Fit the sbm to the word-document network.
         - overlap, bool (default: False). Overlapping or Non-overlapping groups.
             Overlapping not implemented yet
         - hierarchical, bool (default: True). Hierarchical SBM or Flat SBM.
             Flat SBM not implemented yet.
+        - Bmin, int (default:None): pass an option to the graph-tool inference specifying the minimum number of blocks.
+        - n_init, int (default:1): number of different initial conditions to run in order to avoid local minimum of MDL.
         '''
         g = self.g
         if g is None:
@@ -139,9 +141,16 @@ class sbmtm():
                 state_args["eweight"] = g.ep.count
 
             ## the inference
-            state = gt.minimize_nested_blockmodel_dl(g, deg_corr=True,
+            mdl = np.inf ##
+            for i_n_init in range(n_init):
+                state_tmp = gt.minimize_nested_blockmodel_dl(g, deg_corr=True,
                                                      overlap=overlap,
-                                                     state_args=state_args)
+                                                     state_args=state_args,
+                                                     B_min = B_min)
+                mdl_tmp = state_tmp.entropy()
+                if mdl_tmp < mdl:
+                    mdl = 1.0*mdl_tmp
+                    state = state_tmp.copy()
 
             self.state = state
             ## minimum description length
