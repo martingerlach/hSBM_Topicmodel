@@ -459,3 +459,33 @@ class sbmtm():
         return number of edges == tokens
         '''
         return int(self.g.num_edges()) # no. of types
+
+    def group_to_group_mixture(self,l=0,norm=True):
+        V = self.get_V()
+        D = self.get_D()
+        N = self.get_N()
+
+        g = self.g
+        state = self.state
+        state_l = state.project_level(l).copy(overlap=True)
+        state_l_edges = state_l.get_edge_blocks() ## labeled half-edges
+
+        ## count labeled half-edges, group-memberships
+        B = state_l.B
+        n_td_tw = np.zeros((B,B))
+
+        for e in g.edges():
+            z1,z2 = state_l_edges[e]
+            n_td_tw[z1 , z2] += 1
+
+
+        ind_d = np.where(np.sum(n_td_tw,axis=1)>0)[0]
+        Bd = len(ind_d)
+        ind_w = np.where(np.sum(n_td_tw,axis=0)>0)[0]
+        Bw = len(ind_w)
+
+        n_td_tw = n_td_tw[:Bd,Bd:]
+        if norm == True:
+            return n_td_tw/np.sum(n_td_tw)
+        else:
+            return n_td_tw
