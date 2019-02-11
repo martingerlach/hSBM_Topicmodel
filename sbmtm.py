@@ -155,23 +155,26 @@ class sbmtm():
             self.state = state
             ## minimum description length
             self.mdl = state.entropy()
-            ## collect group membership for each level in the hierarchy
-            L = len(state.levels)
-            dict_groups_L = {}
 
-            ## only trivial bipartite structure
-            if L == 2:
-                self.L = 1
-                for l in range(L-1):
-                    dict_groups_l = self.get_groups(l=l)
-                    dict_groups_L[l] = dict_groups_l
-            ## omit trivial levels: l=L-1 (single group), l=L-2 (bipartite)
-            else:
-                self.L = L-2
-                for l in range(L-2):
-                    dict_groups_l = self.get_groups(l=l)
-                    dict_groups_L[l] = dict_groups_l
-            self.groups = dict_groups_L
+            ## do not calculate group memberships right away -- matrices are too large
+
+            ## collect group membership for each level in the hierarchy
+            # L = len(state.levels)
+            # dict_groups_L = {}
+
+            # ## only trivial bipartite structure
+            # if L == 2:
+            #     self.L = 1
+            #     for l in range(L-1):
+            #         dict_groups_l = self.get_groups(l=l)
+            #         dict_groups_L[l] = dict_groups_l
+            # ## omit trivial levels: l=L-1 (single group), l=L-2 (bipartite)
+            # else:
+            #     self.L = L-2
+            #     for l in range(L-2):
+            #         dict_groups_l = self.get_groups(l=l)
+            #         dict_groups_L[l] = dict_groups_l
+            # self.groups = dict_groups_L
 
     def plot(self, filename = None,nedges = 1000):
         '''
@@ -189,7 +192,9 @@ class sbmtm():
         get the n most common words for each word-group in level l.
         return tuples (word,P(w|tw))
         '''
-        dict_groups = self.groups[l]
+        # dict_groups = self.groups[l]
+        dict_groups = self.get_groups(l=l)
+
         Bw = dict_groups['Bw']
         p_w_tw = dict_groups['p_w_tw']
 
@@ -210,7 +215,9 @@ class sbmtm():
         return dict_group_words
 
     def topicdist(self, doc_index, l=0):
-        dict_groups =  self.groups[l]
+        # dict_groups =  self.groups[l]
+        dict_groups = self.get_groups(l=l)
+
         p_tw_d = dict_groups['p_tw_d']
         list_topics_tw = []
         for tw,p_tw in enumerate(p_tw_d[:,doc_index]):
@@ -224,7 +231,8 @@ class sbmtm():
         For the non-overlapping case, each document belongs to one and only one group with prob 1.
 
         '''
-        dict_groups = self.groups[l]
+        # dict_groups = self.groups[l]
+        dict_groups = self.get_groups(l=l)
         Bd = dict_groups['Bd']
         p_td_d = dict_groups['p_td_d']
 
@@ -249,7 +257,8 @@ class sbmtm():
         Note: Works only for non-overlapping model.
         For overlapping case, we need something else.
         '''
-        dict_groups = self.groups[l]
+        # dict_groups = self.groups[l]
+        dict_groups = self.get_groups(l=l)
         Bd = dict_groups['Bd']
         p_td_d = dict_groups['p_td_d']
 
@@ -276,7 +285,8 @@ class sbmtm():
             - word-nodes, p_tw_w, array with shape Bw x V
         It gives the probability of a nodes belonging to one of the groups.
         '''
-        dict_groups = self.groups[l]
+        # dict_groups = self.groups[l]
+        dict_groups = self.get_groups(l=l)
         p_tw_w = dict_groups['p_tw_w']
         p_td_d = dict_groups['p_td_d']
         return p_td_d,p_tw_w
