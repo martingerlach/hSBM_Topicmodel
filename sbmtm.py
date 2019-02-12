@@ -155,11 +155,16 @@ class sbmtm():
             self.state = state
             ## minimum description length
             self.mdl = state.entropy()
+            L = len(state.levels)
+            if L == 2:
+                self.L = 1
+            else:
+                self.L = L-2
 
             ## do not calculate group memberships right away -- matrices are too large
 
             ## collect group membership for each level in the hierarchy
-            # L = len(state.levels)
+            
             # dict_groups_L = {}
 
             # ## only trivial bipartite structure
