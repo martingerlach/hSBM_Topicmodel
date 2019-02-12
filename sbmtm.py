@@ -504,3 +504,22 @@ class sbmtm():
             return n_td_tw/np.sum(n_td_tw)
         else:
             return n_td_tw
+
+    def pmi_td_tw(self,l=0):
+        '''
+        Point-wise mutual information between topic-groups and doc-groups, S(td,tw)
+        This is an array of shape Bd x Bw.
+
+        It corresponds to
+        S(td,tw) = log P(tw | td) / \tilde{P}(tw | td) .
+
+        This is the log-ratio between 
+        P(tw | td) == prb of topic tw in doc-group td;
+        \tilde{P}(tw | td) = P(tw) expected prob of topic tw in doc-group td under random null model.
+        '''
+        p_td_tw = self.group_to_group_mixture(l=l)
+        p_tw_td = p_td_tw.T
+        p_td = np.sum(p_tw_td,axis=0)
+        p_tw = np.sum(p_tw_td,axis=1)
+        pmi_td_tw = np.log(p_tw_td/(p_td*p_tw[:,np.newaxis])).T
+        return pmi_td_tw
