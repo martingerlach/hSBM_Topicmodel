@@ -362,6 +362,26 @@ class sbmtm():
             df.to_html(filename,index=False,na_rep='')
         else:
             pass
+        
+        
+        ## word-distr
+        list_topics = np.arange(len(self.groups[l]['p_w_tw'].T))
+        list_columns = ["Topic %d"%(t+1) for t in list_topics]
+        
+        pwtw_df = pd.DataFrame(data=self.groups[l]['p_w_tw'], index=self.words, columns=list_columns)
+        pwtw_df.replace(0,np.nan)
+        pwtw_df=pwtw_df.dropna(how='all',axis=0)
+        pwtw_df.replace(np.nan,0)
+        if format == 'csv':
+            fname_save = "topsbm_level_%d_word-dist.csv"%l
+            filename = os.path.join(path_save,fname_save)
+            pwtw_df.to_csv(filename,index=True,header=True,na_rep='')
+        elif format == 'html':
+            fname_save = "topsbm_level_%d_word-dist.html"%l
+            filename = os.path.join(path_save,fname_save)
+            pwtw_df.to_html(filename,index=True,na_rep='')
+        else:
+            pass
 
     ###########
     ########### HELPER FUNCTIONS
