@@ -342,6 +342,10 @@ class sbmtm():
             fname_save = 'topsbm_level_%s_topics.html'%(l)
             filename = os.path.join(path_save,fname_save)
             df.to_html(filename,index=False,na_rep='')
+        elif format=='tsv':
+            fname_save = 'topsbm_level_%s_topics.tsv'%(l)
+            filename = os.path.join(path_save,fname_save)
+            df.to_csv(filename,index=False,na_rep='',sep='\t')
         else:
             pass
 
