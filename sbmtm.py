@@ -5,6 +5,7 @@ import os,sys,argparse
 from collections import Counter,defaultdict
 import pickle
 import graph_tool.all as gt
+import sys
 
 
 class sbmtm():
@@ -191,6 +192,19 @@ class sbmtm():
         self.state.draw(layout='bipartite', output=filename,
                         subsample_edges=nedges, hshortcuts=1, hide=0)
 
+    def print_summary(self, tofile=True):
+        '''
+        Print hierarchy summary
+        '''
+        if tofile:
+            orig_stdout = sys.stdout
+            f = open('summary.txt', 'w')
+            sys.stdout = f
+            self.state.print_summary()
+            sys.stdout = orig_stdout
+            f.close()
+        else:
+            self.state.print_summary()
 
     def topics(self, l=0, n=10):
         '''
