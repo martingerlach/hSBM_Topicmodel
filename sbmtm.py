@@ -2,6 +2,7 @@ from __future__ import print_function
 import pandas as pd
 import numpy as np
 import os,sys,argparse
+import matplotlib.pyplot as plt
 from collections import Counter,defaultdict
 import pickle
 import graph_tool.all as gt
@@ -92,7 +93,7 @@ class sbmtm():
                 if v_n[v] < n_min and g.vp['kind'][v]==1:
                     v_filter[v] = False
                 else:
-                    v_filter[v] = True    
+                    v_filter[v] = True
             g.set_vertex_filter(v_filter)
             g.purge_vertices()
             g.clear_filters()
@@ -118,7 +119,7 @@ class sbmtm():
         self.documents = [ self.g.vp['name'][v] for v in  self.g.vertices() if self.g.vp['kind'][v]==0   ]
 
 
-    def fit(self,overlap = False, hierarchical = True, B_min = None, n_init = 1):
+    def fit(self,overlap = False, hierarchical = True, B_min = None, n_init = 1,verbose=False):
         '''
         Fit the sbm to the word-document network.
         - overlap, bool (default: False). Overlapping or Non-overlapping groups.
@@ -146,7 +147,8 @@ class sbmtm():
                 state_tmp = gt.minimize_nested_blockmodel_dl(g, deg_corr=True,
                                                      overlap=overlap,
                                                      state_args=state_args,
-                                                     B_min = B_min)
+                                                     B_min = B_min,
+                                                     verbose=verbose)
                 mdl_tmp = state_tmp.entropy()
                 if mdl_tmp < mdl:
                     mdl = 1.0*mdl_tmp
@@ -164,7 +166,7 @@ class sbmtm():
             ## do not calculate group memberships right away -- matrices are too large
 
             ## collect group membership for each level in the hierarchy
-            
+
             # dict_groups_L = {}
 
             # ## only trivial bipartite structure
@@ -328,6 +330,10 @@ class sbmtm():
             fname_save = 'topsbm_level_%s_topics.html'%(l)
             filename = os.path.join(path_save,fname_save)
             df.to_html(filename,index=False,na_rep='')
+        elif format=='tsv':
+            fname_save = 'topsbm_level_%s_topics.tsv'%(l)
+            filename = os.path.join(path_save,fname_save)
+            df.to_csv(filename,index=False,na_rep='',sep='\t')
         else:
             pass
 
@@ -513,7 +519,7 @@ class sbmtm():
         It corresponds to
         S(td,tw) = log P(tw | td) / \tilde{P}(tw | td) .
 
-        This is the log-ratio between 
+        This is the log-ratio between
         P(tw | td) == prb of topic tw in doc-group td;
         \tilde{P}(tw | td) = P(tw) expected prob of topic tw in doc-group td under random null model.
         '''
@@ -523,3 +529,48 @@ class sbmtm():
         p_tw = np.sum(p_tw_td,axis=1)
         pmi_td_tw = np.log(p_tw_td/(p_td*p_tw[:,np.newaxis])).T
         return pmi_td_tw
+
+
+    def print_summary(self, tofile=True):
+        '''
+        Print hierarchy summary
+        '''
+        if tofile:
+            orig_stdout = sys.stdout
+            f = open('summary.txt', 'w')
+            sys.stdout = f
+            self.state.print_summary()
+            sys.stdout = orig_stdout
+            f.close()
+        else:
+            self.state.print_summary()
+
+    def plot_topic_dist(self, l):
+        groups = self.groups[l]
+        p_w_tw = groups['p_w_tw']
+        fig=plt.figure(figsize=(12,10))
+        plt.imshow(p_w_tw,origin='lower',aspect='auto',interpolation='none')
+        plt.title(r'Word group membership $P(w | tw)$')
+        plt.xlabel('Topic, tw')
+        plt.ylabel('Word w (index)')
+        plt.colorbar()
+        fig.savefig("p_w_tw_%d.png"%l)
+        p_tw_d = groups['p_tw_d']
+        fig=plt.figure(figsize=(12,10))
+        plt.imshow(p_tw_d,origin='lower',aspect='auto',interpolation='none')
+        plt.title(r'Word group membership $P(tw | d)$')
+        plt.xlabel('Document (index)')
+        plt.ylabel('Topic, tw')
+        plt.colorbar()
+        fig.savefig("p_tw_d_%d.png"%l)
+
+    def savedata(self):
+        for i in range(len(self.state.get_levels())-2)[::-1]:
+            print("Saving level %d"%i)
+            self.print_topics(l=i)
+            self.print_topics(l=i, format='tsv')
+            self.plot_topic_dist(i)
+            e = self.state.get_levels()[i].get_matrix()
+            plt.matshow(e.todense())
+            plt.savefig("mat_%d.png"%i)
+        self.print_summary()
