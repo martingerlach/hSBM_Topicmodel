@@ -6,6 +6,7 @@ from collections import Counter,defaultdict
 import pickle
 import graph_tool.all as gt
 import sys
+from matplotlib import pyplot as plt
 
 
 class sbmtm():
@@ -523,13 +524,35 @@ class sbmtm():
         else:
             return n_td_tw
 
-    def pmi_td_tw(self,l=0):
-        '''
-        Point-wise mutual information between topic-groups and doc-groups, S(td,tw)
-        This is an array of shape Bd x Bw.
+    def plot_topic_dist(self, l):
+        groups = self.groups[l]
+        p_w_tw = groups['p_w_tw']
+        fig=plt.figure(figsize=(12,10))
+        plt.imshow(p_w_tw,origin='lower',aspect='auto',interpolation='none')
+        plt.title(r'Word group membership $P(w | tw)$')
+        plt.xlabel('Topic, tw')
+        plt.ylabel('Word w (index)')
+        plt.colorbar()
+        fig.savefig("p_w_tw_%d.png"%l)
+        p_tw_d = groups['p_tw_d']
+        fig=plt.figure(figsize=(12,10))
+        plt.imshow(p_tw_d,origin='lower',aspect='auto',interpolation='none')
+        plt.title(r'Word group membership $P(tw | d)$')
+        plt.xlabel('Document (index)')
+        plt.ylabel('Topic, tw')
+        plt.colorbar()
+        fig.savefig("p_tw_d_%d.png"%l)
 
-        It corresponds to
-        S(td,tw) = log P(tw | td) / \tilde{P}(tw | td) .
+    def savedata(self):
+        for i in range(len(self.state.get_levels())-2)[::-1]:
+            print("Saving level %d"%i)
+            self.print_topics(l=i)
+            self.print_topics(l=i, format='tsv')
+            self.plot_topic_dist(i)
+            e = self.state.get_levels()[i].get_matrix()
+            plt.matshow(e.todense())
+            plt.savefig("mat_%d.png"%i)
+        self.print_summary()
 
         This is the log-ratio between 
         P(tw | td) == prb of topic tw in doc-group td;
