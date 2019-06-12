@@ -2,11 +2,10 @@ from __future__ import print_function
 import pandas as pd
 import numpy as np
 import os,sys,argparse
+import matplotlib.pyplot as plt
 from collections import Counter,defaultdict
 import pickle
 import graph_tool.all as gt
-import sys
-from matplotlib import pyplot as plt
 
 
 class sbmtm():
@@ -94,7 +93,7 @@ class sbmtm():
                 if v_n[v] < n_min and g.vp['kind'][v]==1:
                     v_filter[v] = False
                 else:
-                    v_filter[v] = True    
+                    v_filter[v] = True
             g.set_vertex_filter(v_filter)
             g.purge_vertices()
             g.clear_filters()
@@ -120,7 +119,7 @@ class sbmtm():
         self.documents = [ self.g.vp['name'][v] for v in  self.g.vertices() if self.g.vp['kind'][v]==0   ]
 
 
-    def fit(self,overlap = False, hierarchical = True, B_min = None, n_init = 1):
+    def fit(self,overlap = False, hierarchical = True, B_min = None, n_init = 1,verbose=False):
         '''
         Fit the sbm to the word-document network.
         - overlap, bool (default: False). Overlapping or Non-overlapping groups.
@@ -148,7 +147,8 @@ class sbmtm():
                 state_tmp = gt.minimize_nested_blockmodel_dl(g, deg_corr=True,
                                                      overlap=overlap,
                                                      state_args=state_args,
-                                                     B_min = B_min)
+                                                     B_min = B_min,
+                                                     verbose=verbose)
                 mdl_tmp = state_tmp.entropy()
                 if mdl_tmp < mdl:
                     mdl = 1.0*mdl_tmp
@@ -166,7 +166,7 @@ class sbmtm():
             ## do not calculate group memberships right away -- matrices are too large
 
             ## collect group membership for each level in the hierarchy
-            
+
             # dict_groups_L = {}
 
             # ## only trivial bipartite structure
@@ -193,19 +193,6 @@ class sbmtm():
         self.state.draw(layout='bipartite', output=filename,
                         subsample_edges=nedges, hshortcuts=1, hide=0)
 
-    def print_summary(self, tofile=True):
-        '''
-        Print hierarchy summary
-        '''
-        if tofile:
-            orig_stdout = sys.stdout
-            f = open('summary.txt', 'w')
-            sys.stdout = f
-            self.state.print_summary()
-            sys.stdout = orig_stdout
-            f.close()
-        else:
-            self.state.print_summary()
 
     def topics(self, l=0, n=10):
         '''
@@ -524,6 +511,40 @@ class sbmtm():
         else:
             return n_td_tw
 
+    def pmi_td_tw(self,l=0):
+        '''
+        Point-wise mutual information between topic-groups and doc-groups, S(td,tw)
+        This is an array of shape Bd x Bw.
+
+        It corresponds to
+        S(td,tw) = log P(tw | td) / \tilde{P}(tw | td) .
+
+        This is the log-ratio between
+        P(tw | td) == prb of topic tw in doc-group td;
+        \tilde{P}(tw | td) = P(tw) expected prob of topic tw in doc-group td under random null model.
+        '''
+        p_td_tw = self.group_to_group_mixture(l=l)
+        p_tw_td = p_td_tw.T
+        p_td = np.sum(p_tw_td,axis=0)
+        p_tw = np.sum(p_tw_td,axis=1)
+        pmi_td_tw = np.log(p_tw_td/(p_td*p_tw[:,np.newaxis])).T
+        return pmi_td_tw
+
+
+    def print_summary(self, tofile=True):
+        '''
+        Print hierarchy summary
+        '''
+        if tofile:
+            orig_stdout = sys.stdout
+            f = open('summary.txt', 'w')
+            sys.stdout = f
+            self.state.print_summary()
+            sys.stdout = orig_stdout
+            f.close()
+        else:
+            self.state.print_summary()
+
     def plot_topic_dist(self, l):
         groups = self.groups[l]
         p_w_tw = groups['p_w_tw']
@@ -553,14 +574,3 @@ class sbmtm():
             plt.matshow(e.todense())
             plt.savefig("mat_%d.png"%i)
         self.print_summary()
-
-        This is the log-ratio between 
-        P(tw | td) == prb of topic tw in doc-group td;
-        \tilde{P}(tw | td) = P(tw) expected prob of topic tw in doc-group td under random null model.
-        '''
-        p_td_tw = self.group_to_group_mixture(l=l)
-        p_tw_td = p_td_tw.T
-        p_td = np.sum(p_tw_td,axis=0)
-        p_tw = np.sum(p_tw_td,axis=1)
-        pmi_td_tw = np.log(p_tw_td/(p_td*p_tw[:,np.newaxis])).T
-        return pmi_td_tw
