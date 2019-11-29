@@ -503,6 +503,8 @@ class sbmtm():
         state_l = state.project_level(l).copy(overlap=True)
         state_l_edges = state_l.get_edge_blocks() ## labeled half-edges
 
+        counts = 'count' in self.g.ep.keys()
+
         ## count labeled half-edges, group-memberships
         B = state_l.B
         n_wb = np.zeros((V,B)) ## number of half-edges incident on word-node w and labeled as word-group tw
@@ -513,9 +515,13 @@ class sbmtm():
             z1,z2 = state_l_edges[e]
             v1 = e.source()
             v2 = e.target()
-            n_db[int(v1),z1] += 1
-            n_dbw[int(v1),z2] += 1
-            n_wb[int(v2)-D,z2] += 1
+            if counts:
+                weight = g.ep["count"][e]
+            else:
+                weight = 1
+            n_db[int(v1), z1] += weight
+            n_dbw[int(v1), z2] += weight
+            n_wb[int(v2) - D, z2] += weight
 
         p_w = np.sum(n_wb,axis=1)/float(np.sum(n_wb))
 
@@ -586,9 +592,14 @@ class sbmtm():
         B = state_l.B
         n_td_tw = np.zeros((B,B))
 
+        counts = 'count' in self.g.ep.keys()
+
         for e in g.edges():
             z1,z2 = state_l_edges[e]
-            n_td_tw[z1 , z2] += 1
+            if counts:
+                n_td_tw[z1 , z2] += g.ep["count"][e]
+            else:
+                n_td_tw[z1, z2] += 1
 
 
         ind_d = np.where(np.sum(n_td_tw,axis=1)>0)[0]
