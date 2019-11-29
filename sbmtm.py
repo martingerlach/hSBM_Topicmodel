@@ -2,6 +2,7 @@ from __future__ import print_function
 import pandas as pd
 import numpy as np
 import os,sys,argparse
+import matplotlib.pyplot as plt
 from collections import Counter,defaultdict
 import pickle
 import graph_tool.all as gt
@@ -92,7 +93,7 @@ class sbmtm():
                 if v_n[v] < n_min and g.vp['kind'][v]==1:
                     v_filter[v] = False
                 else:
-                    v_filter[v] = True    
+                    v_filter[v] = True
             g.set_vertex_filter(v_filter)
             g.purge_vertices()
             g.clear_filters()
@@ -101,6 +102,97 @@ class sbmtm():
         self.g = g
         self.words = [ g.vp['name'][v] for v in  g.vertices() if g.vp['kind'][v]==1   ]
         self.documents = [ g.vp['name'][v] for v in  g.vertices() if g.vp['kind'][v]==0   ]
+
+    def make_graph_from_BoW_df(self, df, counts=True, n_min=None):
+        """
+        Load a graph from a Bag of Words DataFrame
+
+        arguments
+        -----------
+        df should be a DataFrame with where df.index is a list of words and df.columns a list of documents
+
+        optional arguments:
+        - counts: save edge-multiplicity as counts (default: True)
+        - n_min, int: filter all word-nodes with less than n_min counts (default None)
+
+        :type df: DataFrame
+        """
+        # make a graph
+        g = gt.Graph(directed=False)
+        ## define node properties
+        ## name: docs - title, words - 'word'
+        ## kind: docs - 0, words - 1
+        name = g.vp["name"] = g.new_vp("string")
+        kind = g.vp["kind"] = g.new_vp("int")
+        if counts:
+            ecount = g.ep["count"] = g.new_ep("int")
+
+        X = df.values
+
+        # add all documents and words as nodes
+        # add all tokens as links
+        X = scipy.sparse.coo_matrix(X)
+
+        if not counts and X.dtype != int:
+            X_int = X.astype(int)
+            if not np.allclose(X.data, X_int.data):
+                raise ValueError('Data must be integer if '
+                                 'weighted_edges=False')
+            X = X_int
+
+        docs_add = defaultdict(lambda: g.add_vertex())
+        words_add = defaultdict(lambda: g.add_vertex())
+
+        D = len(df.columns)
+        ## add all documents first
+        for i_d in range(D):
+            title = df.columns[i_d]
+            d = docs_add[title]
+            name[d] = title
+            kind[d] = 0
+
+        ## add all words
+        for i_d in range(len(df.index)):
+            word = df.index[i_d]
+            w = words_add[word]
+            name[w] = word
+            kind[w] = 1
+
+        ## add all documents and words as nodes
+        ## add all tokens as links
+        for i_d in range(D):
+            title = df.columns[i_d]
+            text = df[title]
+            for i_w, word, count in zip(range(len(df.index)), df.index, text):
+                if count < 1:
+                    continue
+                if counts:
+                    e = g.add_edge(i_d, D + i_w)
+                    ecount[e] = count
+                else:
+                    for n in range(count):
+                        g.add_edge(i_d, D + i_w)
+
+        ## filter word-types with less than n_min counts
+        if n_min is not None:
+            v_n = g.new_vertex_property("int")
+            for v in g.vertices():
+                v_n[v] = v.out_degree()
+
+            v_filter = g.new_vertex_property("bool")
+            for v in g.vertices():
+                if v_n[v] < n_min and g.vp['kind'][v] == 1:
+                    v_filter[v] = False
+                else:
+                    v_filter[v] = True
+            g.set_vertex_filter(v_filter)
+            g.purge_vertices()
+            g.clear_filters()
+
+        self.g = g
+        self.words = [g.vp['name'][v] for v in g.vertices() if g.vp['kind'][v] == 1]
+        self.documents = [g.vp['name'][v] for v in g.vertices() if g.vp['kind'][v] == 0]
+        return self
 
     def save_graph(self,filename = 'graph.gt.gz'):
         '''
@@ -118,7 +210,7 @@ class sbmtm():
         self.documents = [ self.g.vp['name'][v] for v in  self.g.vertices() if self.g.vp['kind'][v]==0   ]
 
 
-    def fit(self,overlap = False, hierarchical = True, B_min = None, n_init = 1):
+    def fit(self,overlap = False, hierarchical = True, B_min = None, n_init = 1,verbose=False):
         '''
         Fit the sbm to the word-document network.
         - overlap, bool (default: False). Overlapping or Non-overlapping groups.
@@ -146,7 +238,8 @@ class sbmtm():
                 state_tmp = gt.minimize_nested_blockmodel_dl(g, deg_corr=True,
                                                      overlap=overlap,
                                                      state_args=state_args,
-                                                     B_min = B_min)
+                                                     B_min = B_min,
+                                                     verbose=verbose)
                 mdl_tmp = state_tmp.entropy()
                 if mdl_tmp < mdl:
                     mdl = 1.0*mdl_tmp
@@ -155,23 +248,31 @@ class sbmtm():
             self.state = state
             ## minimum description length
             self.mdl = state.entropy()
-            ## collect group membership for each level in the hierarchy
             L = len(state.levels)
-            dict_groups_L = {}
-
-            ## only trivial bipartite structure
             if L == 2:
                 self.L = 1
-                for l in range(L-1):
-                    dict_groups_l = self.get_groups(l=l)
-                    dict_groups_L[l] = dict_groups_l
-            ## omit trivial levels: l=L-1 (single group), l=L-2 (bipartite)
             else:
                 self.L = L-2
-                for l in range(L-2):
-                    dict_groups_l = self.get_groups(l=l)
-                    dict_groups_L[l] = dict_groups_l
-            self.groups = dict_groups_L
+
+            ## do not calculate group memberships right away -- matrices are too large
+
+            ## collect group membership for each level in the hierarchy
+
+            # dict_groups_L = {}
+
+            # ## only trivial bipartite structure
+            # if L == 2:
+            #     self.L = 1
+            #     for l in range(L-1):
+            #         dict_groups_l = self.get_groups(l=l)
+            #         dict_groups_L[l] = dict_groups_l
+            # ## omit trivial levels: l=L-1 (single group), l=L-2 (bipartite)
+            # else:
+            #     self.L = L-2
+            #     for l in range(L-2):
+            #         dict_groups_l = self.get_groups(l=l)
+            #         dict_groups_L[l] = dict_groups_l
+            # self.groups = dict_groups_L
 
     def plot(self, filename = None,nedges = 1000):
         '''
@@ -189,7 +290,9 @@ class sbmtm():
         get the n most common words for each word-group in level l.
         return tuples (word,P(w|tw))
         '''
-        dict_groups = self.groups[l]
+        # dict_groups = self.groups[l]
+        dict_groups = self.get_groups(l=l)
+
         Bw = dict_groups['Bw']
         p_w_tw = dict_groups['p_w_tw']
 
@@ -210,7 +313,9 @@ class sbmtm():
         return dict_group_words
 
     def topicdist(self, doc_index, l=0):
-        dict_groups =  self.groups[l]
+        # dict_groups =  self.groups[l]
+        dict_groups = self.get_groups(l=l)
+
         p_tw_d = dict_groups['p_tw_d']
         list_topics_tw = []
         for tw,p_tw in enumerate(p_tw_d[:,doc_index]):
@@ -224,7 +329,8 @@ class sbmtm():
         For the non-overlapping case, each document belongs to one and only one group with prob 1.
 
         '''
-        dict_groups = self.groups[l]
+        # dict_groups = self.groups[l]
+        dict_groups = self.get_groups(l=l)
         Bd = dict_groups['Bd']
         p_td_d = dict_groups['p_td_d']
 
@@ -249,7 +355,8 @@ class sbmtm():
         Note: Works only for non-overlapping model.
         For overlapping case, we need something else.
         '''
-        dict_groups = self.groups[l]
+        # dict_groups = self.groups[l]
+        dict_groups = self.get_groups(l=l)
         Bd = dict_groups['Bd']
         p_td_d = dict_groups['p_td_d']
 
@@ -276,7 +383,8 @@ class sbmtm():
             - word-nodes, p_tw_w, array with shape Bw x V
         It gives the probability of a nodes belonging to one of the groups.
         '''
-        dict_groups = self.groups[l]
+        # dict_groups = self.groups[l]
+        dict_groups = self.get_groups(l=l)
         p_tw_w = dict_groups['p_tw_w']
         p_td_d = dict_groups['p_td_d']
         return p_td_d,p_tw_w
@@ -313,6 +421,10 @@ class sbmtm():
             fname_save = 'topsbm_level_%s_topics.html'%(l)
             filename = os.path.join(path_save,fname_save)
             df.to_html(filename,index=False,na_rep='')
+        elif format=='tsv':
+            fname_save = 'topsbm_level_%s_topics.tsv'%(l)
+            filename = os.path.join(path_save,fname_save)
+            df.to_csv(filename,index=False,na_rep='',sep='\t')
         else:
             pass
 
@@ -391,6 +503,8 @@ class sbmtm():
         state_l = state.project_level(l).copy(overlap=True)
         state_l_edges = state_l.get_edge_blocks() ## labeled half-edges
 
+        counts = 'count' in self.g.ep.keys()
+
         ## count labeled half-edges, group-memberships
         B = state_l.B
         n_wb = np.zeros((V,B)) ## number of half-edges incident on word-node w and labeled as word-group tw
@@ -401,9 +515,13 @@ class sbmtm():
             z1,z2 = state_l_edges[e]
             v1 = e.source()
             v2 = e.target()
-            n_db[int(v1),z1] += 1
-            n_dbw[int(v1),z2] += 1
-            n_wb[int(v2)-D,z2] += 1
+            if counts:
+                weight = g.ep["count"][e]
+            else:
+                weight = 1
+            n_db[int(v1), z1] += weight
+            n_dbw[int(v1), z2] += weight
+            n_wb[int(v2) - D, z2] += weight
 
         p_w = np.sum(n_wb,axis=1)/float(np.sum(n_wb))
 
@@ -474,9 +592,14 @@ class sbmtm():
         B = state_l.B
         n_td_tw = np.zeros((B,B))
 
+        counts = 'count' in self.g.ep.keys()
+
         for e in g.edges():
             z1,z2 = state_l_edges[e]
-            n_td_tw[z1 , z2] += 1
+            if counts:
+                n_td_tw[z1 , z2] += g.ep["count"][e]
+            else:
+                n_td_tw[z1, z2] += 1
 
 
         ind_d = np.where(np.sum(n_td_tw,axis=1)>0)[0]
@@ -489,3 +612,67 @@ class sbmtm():
             return n_td_tw/np.sum(n_td_tw)
         else:
             return n_td_tw
+
+    def pmi_td_tw(self,l=0):
+        '''
+        Point-wise mutual information between topic-groups and doc-groups, S(td,tw)
+        This is an array of shape Bd x Bw.
+
+        It corresponds to
+        S(td,tw) = log P(tw | td) / \tilde{P}(tw | td) .
+
+        This is the log-ratio between
+        P(tw | td) == prb of topic tw in doc-group td;
+        \tilde{P}(tw | td) = P(tw) expected prob of topic tw in doc-group td under random null model.
+        '''
+        p_td_tw = self.group_to_group_mixture(l=l)
+        p_tw_td = p_td_tw.T
+        p_td = np.sum(p_tw_td,axis=0)
+        p_tw = np.sum(p_tw_td,axis=1)
+        pmi_td_tw = np.log(p_tw_td/(p_td*p_tw[:,np.newaxis])).T
+        return pmi_td_tw
+
+
+    def print_summary(self, tofile=True):
+        '''
+        Print hierarchy summary
+        '''
+        if tofile:
+            orig_stdout = sys.stdout
+            f = open('summary.txt', 'w')
+            sys.stdout = f
+            self.state.print_summary()
+            sys.stdout = orig_stdout
+            f.close()
+        else:
+            self.state.print_summary()
+
+    def plot_topic_dist(self, l):
+        groups = self.groups[l]
+        p_w_tw = groups['p_w_tw']
+        fig=plt.figure(figsize=(12,10))
+        plt.imshow(p_w_tw,origin='lower',aspect='auto',interpolation='none')
+        plt.title(r'Word group membership $P(w | tw)$')
+        plt.xlabel('Topic, tw')
+        plt.ylabel('Word w (index)')
+        plt.colorbar()
+        fig.savefig("p_w_tw_%d.png"%l)
+        p_tw_d = groups['p_tw_d']
+        fig=plt.figure(figsize=(12,10))
+        plt.imshow(p_tw_d,origin='lower',aspect='auto',interpolation='none')
+        plt.title(r'Word group membership $P(tw | d)$')
+        plt.xlabel('Document (index)')
+        plt.ylabel('Topic, tw')
+        plt.colorbar()
+        fig.savefig("p_tw_d_%d.png"%l)
+
+    def save_data(self):
+        for i in range(len(self.state.get_levels())-2)[::-1]:
+            print("Saving level %d"%i)
+            self.print_topics(l=i)
+            self.print_topics(l=i, format='tsv')
+            self.plot_topic_dist(i)
+            e = self.state.get_levels()[i].get_matrix()
+            plt.matshow(e.todense())
+            plt.savefig("mat_%d.png"%i)
+        self.print_summary()
