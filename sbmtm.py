@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from collections import Counter,defaultdict
 import pickle
 import graph_tool.all as gt
-
+from joblib import Parallel, delayed
 
 class sbmtm():
     '''
@@ -210,7 +210,7 @@ class sbmtm():
         self.documents = [ self.g.vp['name'][v] for v in  self.g.vertices() if self.g.vp['kind'][v]==0   ]
 
 
-    def fit(self,overlap = False, hierarchical = True, B_min = None, n_init = 1,verbose=False):
+    def fit(self,overlap = False, hierarchical = True, B_min = None, n_init = 1, n_jobs = 1, verbose=False):
         '''
         Fit the sbm to the word-document network.
         - overlap, bool (default: False). Overlapping or Non-overlapping groups.
@@ -219,6 +219,7 @@ class sbmtm():
             Flat SBM not implemented yet.
         - Bmin, int (default:None): pass an option to the graph-tool inference specifying the minimum number of blocks.
         - n_init, int (default:1): number of different initial conditions to run in order to avoid local minimum of MDL.
+        - n_jobs, int (default:1): number of processes to execute for running multiple initial conditions in parallel.
         '''
         g = self.g
         if g is None:
@@ -234,12 +235,15 @@ class sbmtm():
 
             ## the inference
             mdl = np.inf ##
+            runs = Parallel(n_jobs=n_jobs, 
+                            backend='multiprocessing')(delayed(gt.minimize_nested_blockmodel_dl)(g, 
+                                                                                                 deg_corr=True,
+                                                                                                 overlap=overlap,
+                                                                                                 B_min=B_min,
+                                                                                                 verbose=verbose)
+                                                       for _ in range(n_init))
             for i_n_init in range(n_init):
-                state_tmp = gt.minimize_nested_blockmodel_dl(g, deg_corr=True,
-                                                     overlap=overlap,
-                                                     state_args=state_args,
-                                                     B_min = B_min,
-                                                     verbose=verbose)
+                state_tmp = runs[i_n_init]
                 mdl_tmp = state_tmp.entropy()
                 if mdl_tmp < mdl:
                     mdl = 1.0*mdl_tmp
