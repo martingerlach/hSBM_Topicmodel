@@ -239,6 +239,7 @@ class sbmtm():
                                                                                      deg_corr=True,
                                                                                      overlap=overlap,
                                                                                      B_min=B_min,
+                                                                                     state_args=state_args,
                                                                                      verbose=verbose)
                                            for _ in range(n_init))
             for i_n_init in range(n_init):
