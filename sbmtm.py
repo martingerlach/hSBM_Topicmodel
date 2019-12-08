@@ -235,13 +235,12 @@ class sbmtm():
 
             ## the inference
             mdl = np.inf ##
-            runs = Parallel(n_jobs=n_jobs, 
-                            backend='multiprocessing')(delayed(gt.minimize_nested_blockmodel_dl)(g, 
-                                                                                                 deg_corr=True,
-                                                                                                 overlap=overlap,
-                                                                                                 B_min=B_min,
-                                                                                                 verbose=verbose)
-                                                       for _ in range(n_init))
+            runs = Parallel(n_jobs=n_jobs)(delayed(gt.minimize_nested_blockmodel_dl)(g, 
+                                                                                     deg_corr=True,
+                                                                                     overlap=overlap,
+                                                                                     B_min=B_min,
+                                                                                     verbose=verbose)
+                                           for _ in range(n_init))
             for i_n_init in range(n_init):
                 state_tmp = runs[i_n_init]
                 mdl_tmp = state_tmp.entropy()
