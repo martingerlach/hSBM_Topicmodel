@@ -210,6 +210,23 @@ class sbmtm():
         self.documents = [ self.g.vp['name'][v] for v in  self.g.vertices() if self.g.vp['kind'][v]==0   ]
 
 
+    def dump_model(self, filename="topsbm.pkl"):
+        with open(filename, 'wb') as f:
+            pickle.dump(self, f)
+
+    def load_model(self, filename="topsbm.pkl"):
+        if self.g is not None:
+            del self.g
+        del self.words
+        del self.documents
+        if self.state is not None:
+            del self.state
+        del self.groups
+        del self.mdl
+        del self.L
+        with open(filename, 'rb') as f:
+            self = pickle.load(f)
+
     def fit(self,overlap = False, hierarchical = True, B_min = None, n_init = 1,verbose=False):
         '''
         Fit the sbm to the word-document network.
