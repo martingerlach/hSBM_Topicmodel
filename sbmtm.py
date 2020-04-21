@@ -564,6 +564,10 @@ class sbmtm():
     ########### HELPER FUNCTIONS
     ###########
     ## get group-topic statistics
+
+    def get_mdl(self):
+        return self.mdl
+
     def get_groups(self,l=0):
         '''
         extract statistics on group membership of nodes form the inferred state.
