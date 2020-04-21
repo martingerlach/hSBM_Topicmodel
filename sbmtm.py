@@ -227,7 +227,7 @@ class sbmtm():
         with open(filename, 'rb') as f:
             self = pickle.load(f)
 
-    def fit(self,overlap = False, hierarchical = True, B_min = None, n_init = 1,verbose=False):
+    def fit(self, overlap=False, hierarchical=True, B_min=None, B_max=None, n_init=1, parallel=False, verbose=False):
         '''
         Fit the sbm to the word-document network.
         - overlap, bool (default: False). Overlapping or Non-overlapping groups.
@@ -237,6 +237,9 @@ class sbmtm():
         - Bmin, int (default:None): pass an option to the graph-tool inference specifying the minimum number of blocks.
         - n_init, int (default:1): number of different initial conditions to run in order to avoid local minimum of MDL.
         '''
+
+        sequential = not parallel
+
         g = self.g
         if g is None:
             print('No data to fit the SBM. Load some data first (make_graph)')
@@ -250,18 +253,35 @@ class sbmtm():
                 state_args["eweight"] = g.ep.count
 
             ## the inference
-            mdl = np.inf ##
+            mdl = np.inf  ##
             for i_n_init in range(n_init):
-                state_tmp = gt.minimize_nested_blockmodel_dl(g, deg_corr=True,
-                                                     overlap=overlap,
-                                                     state_args=state_args,
-                                                     B_min = B_min,
-                                                     verbose=verbose)
+                state_tmp = gt.minimize_nested_blockmodel_dl(g,
+                                                             deg_corr=True,
+                                                             overlap=overlap,
+                                                             state_args=state_args,
+                                                             mcmc_args={'sequential': sequential},
+                                                             mcmc_equilibrate_args={
+                                                                 'mcmc_args': {'sequential': sequential}},
+                                                             mcmc_multilevel_args={
+                                                                 'mcmc_equilibrate_args': {
+                                                                     'mcmc_args': {'sequential': sequential}
+                                                                 },
+                                                                 'anneal_args': {
+                                                                     'mcmc_equilibrate_args': {
+                                                                         'mcmc_args': {'sequential': sequential}
+                                                                     }
+                                                                 }
+                                                             },
+                                                             B_min=B_min,
+                                                             B_max=B_max,
+                                                             verbose=verbose
+                                                             )
                 mdl_tmp = state_tmp.entropy()
                 if mdl_tmp < mdl:
-                    mdl = 1.0*mdl_tmp
+                    mdl = 1.0 * mdl_tmp
                     state = state_tmp.copy()
 
+            self.mdl = mdl
             self.state = state
             ## minimum description length
             self.mdl = state.entropy()
@@ -270,7 +290,7 @@ class sbmtm():
                 self.L = 1
             else:
                 self.L = L-2
-
+                
             ## do not calculate group memberships right away -- matrices are too large
 
             ## collect group membership for each level in the hierarchy
