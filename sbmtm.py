@@ -290,7 +290,7 @@ class sbmtm():
                 self.L = 1
             else:
                 self.L = L-2
-                
+
             ## do not calculate group memberships right away -- matrices are too large
 
             ## collect group membership for each level in the hierarchy
@@ -310,6 +310,54 @@ class sbmtm():
             #         dict_groups_l = self.get_groups(l=l)
             #         dict_groups_L[l] = dict_groups_l
             # self.groups = dict_groups_L
+
+    def multiflip_mcmc_sweep(self, n_steps=1000, beta=np.inf, niter=10, verbose=True):
+        '''
+        Fit the sbm to the word-document network. Use multtiplip_mcmc_sweep
+        - n_steps, int (default:1): number of steps.
+        '''
+        g = self.g
+        if g is None:
+            print('No data to fit the SBM. Load some data first (make_graph)')
+        else:
+            clabel = g.vp['kind']
+
+            state_args = {'clabel': clabel, 'pclabel': clabel}
+            if "count" in g.ep:
+                state_args["eweight"] = g.ep.count
+
+        state = self.state
+        if state is not None:
+            state = state.copy(bs=state.get_bs() + [np.zeros(1)] * 4,sampling = True)
+        else:
+            state = gt.NestedBlockState(g)
+
+        for step in range(n_steps): # this should be sufficiently large
+          if verbose:
+              print(f"step: {step}")
+          state.multiflip_mcmc_sweep(beta=beta, niter=niter)
+
+        self.state = state
+        ## minimum description length
+        self.mdl = self.state.entropy()
+        ## collect group membership for each level in the hierarchy
+        L = len(state.levels)
+        dict_groups_L = {}
+
+        ## only trivial bipartite structure
+        if L == 2:
+            self.L = 1
+            for l in range(L-1):
+                dict_groups_l = self.get_groups(l=l)
+                dict_groups_L[l] = dict_groups_l
+        ## omit trivial levels: l=L-1 (single group), l=L-2 (bipartite)
+        else:
+            self.L = L-2
+            for l in range(L-2):
+                dict_groups_l = self.get_groups(l=l)
+                dict_groups_L[l] = dict_groups_l
+        self.groups = dict_groups_L
+
 
     def plot(self, filename = None,nedges = 1000):
         '''
