@@ -36,7 +36,7 @@ In order to do topic modeling with stochastic block models we need to get the co
 
 Start jupyter notebooks
 
-`jupter notebook`
+`jupyter notebook`
 
 then select the 'TopSBM-tutorial'-notebook.
 
