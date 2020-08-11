@@ -14,8 +14,10 @@ Optionally, we can provide a file with titles for the documents in titles.txt
 
 We use the [graph-tool](https://graph-tool.skewed.de/) package for finding topical structure in the word-document networks.
 - a common usecase is to install graph-tool via [Anaconda] (https://www.anaconda.com) using the command:
+
 `conda install -c conda-forge graph-tool`
-- see the [installation-instructions](https://git.skewed.de/count0/graph-tool/wikis/installation-instructions), where you will find packages for linux, etc.
+
+- also see the [installation-instructions for graph-tool](https://git.skewed.de/count0/graph-tool/wikis/installation-instructions), where you will find packages for linux, etc.
 - an alternative for linux is to install via a conda-environment, see [here](https://gitlab.com/ostrokach-forge/graph-tool)
 
 #### Get Jupyter notebook
