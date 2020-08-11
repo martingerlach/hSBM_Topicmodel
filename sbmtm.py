@@ -676,3 +676,20 @@ class sbmtm():
             plt.matshow(e.todense())
             plt.savefig("mat_%d.png"%i)
         self.print_summary()
+    
+    def getTopicOrderingForLevel(self, level): # return the order of the topics on the visualization (top to bottom)
+        levels = self.state.get_levels()
+        model_dicts = self.get_groups(level)
+        graph_hierarchy_tree = gt.get_hierarchy_tree(self.state)
+        label_property_map = graph_hierarchy_tree[1]
+        order_property_map = graph_hierarchy_tree[2]    
+        base_topic_block = levels[0].get_N()
+        base_topic_block+=model_dicts['Bd'] # start counting after doc blocks
+        t_ordering_dict = {}    
+        for i in range(0,model_dicts['Bw']): # each word block is a topic    
+            t_ordering_dict[i] = {"order": order_property_map[base_topic_block+i], "topic_number":i }
+        t_ordering_df = pd.DataFrame.from_dict(t_ordering_dict, orient="index")
+        t_ordering_df = t_ordering_df.sort_values(by="order", ascending=True)
+        t_ordering_df.reset_index(inplace=True)
+        return t_ordering_df[['topic_number']]
+
