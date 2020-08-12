@@ -684,6 +684,9 @@ class sbmtm():
         label_property_map = graph_hierarchy_tree[1]
         order_property_map = graph_hierarchy_tree[2]    
         base_topic_block = levels[0].get_N()
+        if l>0:
+            for l in range(1, level):  # account for blocks at prior levels
+                base_topic_block += levels[l].get_B()
         base_topic_block+=model_dicts['Bd'] # start counting after doc blocks
         t_ordering_dict = {}    
         for i in range(0,model_dicts['Bw']): # each word block is a topic    

@@ -28,7 +28,7 @@ In order to execture the tutorial-notebook, install [jupyter](http://jupyter.org
 
 #### Get hSBM-TopicModel repository
 
-In order to do topic modeling with stochastic block models we need to get the code from the repositroy:
+In order to do topic modeling with stochastic block models we need to get the code from the repository:
 
 `git clone https://github.com/martingerlach/hSBM_Topicmodel.git`
 
@@ -52,5 +52,5 @@ It will guide you through the different steps to do topic modeling with stochast
 	- the topic mixtures for each document
 
 - How to visualize the topical structure, in particular the hierarchy of topics
-
+    - the visual (vertical) order of topics on the chord diagram
 
