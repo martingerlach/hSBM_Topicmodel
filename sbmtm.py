@@ -281,8 +281,9 @@ class sbmtm():
         - filename, str; where to save the plot. if None, will not be saved
         - nedges, int; subsample  to plot (faster, less memory)
         '''
-        self.state.draw(layout='bipartite', output=filename,
+        plot_tuple = self.state.draw(layout='bipartite', output=filename,
                         subsample_edges=nedges, hshortcuts=1, hide=0)
+        return plot_tuple
 
 
     def topics(self, l=0, n=10):
@@ -677,19 +678,18 @@ class sbmtm():
             plt.savefig("mat_%d.png"%i)
         self.print_summary()
     
-    def getTopicOrderingForLevel(self, level): # return the order of the topics on the visualization (top to bottom)
+    def getTopicOrderingForLevel(self, level, pos_vertex_property_map_from_plot): # return the order of the topics on the visualization (top to bottom)
         levels = self.state.get_levels()
         model_dicts = self.get_groups(level)
         graph_hierarchy_tree = gt.get_hierarchy_tree(self.state)
-        label_property_map = graph_hierarchy_tree[1]
-        order_property_map = graph_hierarchy_tree[2]    
+        label_property_map = graph_hierarchy_tree[1]        
         base_block_for_level = levels[0].get_N()
         for l in range(0, level): 
             base_block_for_level += levels[l].get_B()
         base_topic_block = base_block_for_level + model_dicts['Bd']  # start counting after doc blocks
         t_ordering_dict = {}    
         for i in range(0,model_dicts['Bw']): # each word block is a topic    
-            t_ordering_dict[i] = {"order": order_property_map[base_topic_block+i], "topic_number":i ,"block_number": label_property_map[base_topic_block+i]}
+            t_ordering_dict[i] = {"order": pos_vertex_property_map_from_plot[base_topic_block+i][1], "topic_number":i ,"block_number": label_property_map[base_topic_block+i]}
         t_ordering_df = pd.DataFrame.from_dict(t_ordering_dict, orient="index")
         t_ordering_df = t_ordering_df.sort_values(by="order", ascending=True)
         t_ordering_df.reset_index(inplace=True)
