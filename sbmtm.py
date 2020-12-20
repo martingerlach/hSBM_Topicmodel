@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from collections import Counter,defaultdict
 import pickle
 import graph_tool.all as gt
+import scipy
 
 
 class sbmtm():
