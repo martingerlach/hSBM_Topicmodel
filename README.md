@@ -56,10 +56,25 @@ The example-corpus is saved in `corpus.txt`
 
 ## Multilayer SBM for topic modeling beyond text
 
-This method provides a multilayer extension to the stoachstic block model approach for topic modeling.
+This method provides a multilayer extension to the Stochastic Block Model approach for topic modeling.
 
 #### Code
+The code implementing a multilayer extension to the stochastic block model has been implemented for the 2-layer SBM containing a hyperlink and text layer. The addition of a metadata layer can be done by following the process for the addition of the hyperlink layer.
 
 Code-base: `sbmmultilayer.py`
 
 Tutorial-notebook: `Multilayer_SBM_Tutorial.ipynb`
+
+The tutorial notebook details how to
+- Construct a multilayer SBM with the hyperlink and text layer
+- Fit a multilayer SBM using simulated annealing for improved inference 
+- Extract the consensus partitions from multiple runs of the fitting procedure
+- Extract the topics and topic proportions associated to *blocks* of documents
+
+
+#### Data
+The associated Wikipedia dataset is saved in a zip file in `data/dataset-four.zip`. 
+- Contains three 3 types of data.
+- Hyperlink: Each Wikipedia article has a hyperlink to another Wikipedia article.
+- Text: Each Wikipedia contains text associated to it.
+- Metadata: Each Wikipedia has a category assigned to it by Wikipedia users.

@@ -16,12 +16,10 @@ from collections import Counter,defaultdict
 
 class sbmmultilayer:
     """
-    Topic modelling using Hierarchical Multilayer Stochastic Block Model.
-
-    The network of interest in this class is a bipartite network between
-    documents and word-types, incorporating the hyperlink information among
-    documents as a separate layer. The bipartite network is based off the TopSBM
-    formulation.
+    Topic modelling using Hierarchical Multilayer Stochastic Block Model. The 
+    model is an implementatino of a 2-layer multilayer SBM where the first layer 
+    is a bipartite network between documents and word-types based off the TopSBM
+    formulation. The second layer is a hyperlink network between the documents.
 
     Parameters
     ----------

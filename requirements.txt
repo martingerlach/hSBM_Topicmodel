@@ -3,3 +3,8 @@ matplotlib
 numpy
 scipy
 pandas
+os
+pgi
+nltk
+pymc3
+seaborn
