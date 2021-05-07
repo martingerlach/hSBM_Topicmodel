@@ -81,14 +81,12 @@ The associated Wikipedia dataset is saved in a zip file in `data/dataset-four.zi
 - Metadata: Each Wikipedia has a category assigned to it by Wikipedia users.
 
 ##### Arxiv Dataset
+The arxiv-dataset contains 2542 scientific papers from the High-Energy-Physics-Theory category on arxiv with 3 types of information:
+- Directed links (paper A citing paper B)
+- Text (title and abstract of the paper)
+- Metadata (arxiv categories of the paper)
 
-High-energy-physics Arxiv dataset with ~20,000 papers. The data can be obtained from [here](http://snap.stanford.edu/data/cit-HepTh.html).
-
-Specifically, the files to download are:
-- [cit-HepTh.txt.gz](http://snap.stanford.edu/data/cit-HepTh.txt.gz) this contains the edges
-- [cit-HepTh-abstracts.tar.gz](http://snap.stanford.edu/data/cit-HepTh-abstracts.tar.gz) this contains all the metadata
-
-The Arxiv dataset is then filtered for papers that contains references to other papers, text, and categories.
+The dataset was dervied from the "High-energy physics theory citation network" dataset (available [here](http://snap.stanford.edu/data/cit-HepTh.html)) containing 27,770 papers by filtering those papers which contain at least one category besides the High-Energy-Physics-Theory category (all papers in this dataset contain the latter category).
 
 ##### Enron Dataset
 
