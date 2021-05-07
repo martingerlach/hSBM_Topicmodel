@@ -73,8 +73,23 @@ The tutorial notebook details how to
 
 
 #### Data
+##### Wikipedia Dataset
 The associated Wikipedia dataset is saved in a zip file in `data/dataset-four.zip`. 
 - Contains three 3 types of data.
 - Hyperlink: Each Wikipedia article has a hyperlink to another Wikipedia article.
 - Text: Each Wikipedia contains text associated to it.
 - Metadata: Each Wikipedia has a category assigned to it by Wikipedia users.
+
+##### Arxiv Dataset
+The arxiv-dataset contains 2542 scientific papers from the High-Energy-Physics-Theory category on arxiv with 3 types of information:
+- Directed links (paper A citing paper B)
+- Text (title and abstract of the paper)
+- Metadata (arxiv categories of the paper)
+
+The dataset was dervied from the "High-energy physics theory citation network" dataset (available [here](http://snap.stanford.edu/data/cit-HepTh.html)) containing 27,770 papers by filtering those papers which contain at least one category besides the High-Energy-Physics-Theory category (all papers in this dataset contain the latter category).
+
+##### Enron Dataset
+
+Published Enron emails with ~0.5 million emails. The data can be obtained from [here](http://snap.stanford.edu/data/email-Enron.html). It was obtained by the Federal Energy Regulatory Commission during its investigation of Enron's collapse.
+
+The May 7, 2015 Version of dataset is uploaded here. A processed form of the Enron emails can be found [here](https://www.kaggle.com/wcukierski/enron-email-dataset).
