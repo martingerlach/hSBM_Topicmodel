@@ -228,7 +228,7 @@ class sbmtm():
         with open(filename, 'rb') as f:
             self = pickle.load(f)
 
-    def fit(self, overlap=False, hierarchical=True, B_min=None, B_max=None, n_init=1, parallel=False, verbose=False):
+    def fit(self, overlap=False, hierarchical=True, B_min=2, B_max=None, n_init=1, parallel=False, verbose=False):
         '''
         Fit the sbm to the word-document network.
         - overlap, bool (default: False). Overlapping or Non-overlapping groups.
@@ -253,29 +253,22 @@ class sbmtm():
             if "count" in g.ep:
                 state_args["eweight"] = g.ep.count
 
+            state_args["deg_corr"]=True
+            state_args["overlap"]=overlap
+
+            if B_max is None:
+                B_max = self.g.num_vertices()
+
             ## the inference
             mdl = np.inf  ##
             for i_n_init in range(n_init):
                 state_tmp = gt.minimize_nested_blockmodel_dl(g,
-                                                             deg_corr=True,
-                                                             overlap=overlap,
                                                              state_args=state_args,
-                                                             mcmc_args={'sequential': sequential},
-                                                             mcmc_equilibrate_args={
-                                                                 'mcmc_args': {'sequential': sequential}},
-                                                             mcmc_multilevel_args={
-                                                                 'mcmc_equilibrate_args': {
-                                                                     'mcmc_args': {'sequential': sequential}
-                                                                 },
-                                                                 'anneal_args': {
-                                                                     'mcmc_equilibrate_args': {
-                                                                         'mcmc_args': {'sequential': sequential}
-                                                                     }
-                                                                 }
+                                                             multilevel_mcmc_args={
+                                                                 "B_min":B_min,
+                                                                 "B_max":B_max,
+                                                                 "verbose":verbose
                                                              },
-                                                             B_min=B_min,
-                                                             B_max=B_max,
-                                                             verbose=verbose
                                                              )
                 mdl_tmp = state_tmp.entropy()
                 if mdl_tmp < mdl:
@@ -596,7 +589,7 @@ class sbmtm():
         counts = 'count' in self.g.ep.keys()
 
         ## count labeled half-edges, group-memberships
-        B = state_l.B
+        B = state_l.get_B()
         n_wb = np.zeros((V,B)) ## number of half-edges incident on word-node w and labeled as word-group tw
         n_db = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as document-group td
         n_dbw = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as word-group td
