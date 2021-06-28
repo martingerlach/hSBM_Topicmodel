@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 from collections import Counter,defaultdict
 import pickle
 import graph_tool.all as gt
-import scipy
 
 
 class sbmtm():
@@ -211,36 +210,13 @@ class sbmtm():
         self.documents = [ self.g.vp['name'][v] for v in  self.g.vertices() if self.g.vp['kind'][v]==0   ]
 
 
-    def dump_model(self, filename="topsbm.pkl"):
-        with open(filename, 'wb') as f:
-            pickle.dump(self, f)
-
-    def load_model(self, filename="topsbm.pkl"):
-        if self.g is not None:
-            del self.g
-        del self.words
-        del self.documents
-        if self.state is not None:
-            del self.state
-        del self.groups
-        del self.mdl
-        del self.L
-        with open(filename, 'rb') as f:
-            self = pickle.load(f)
-
-    def fit(self, overlap=False, hierarchical=True, B_min=None, B_max=None, n_init=1, parallel=False, verbose=False):
+    def fit(self,overlap = False, n_init = 1, verbose=False, epsilon=1e-3):
         '''
         Fit the sbm to the word-document network.
         - overlap, bool (default: False). Overlapping or Non-overlapping groups.
             Overlapping not implemented yet
-        - hierarchical, bool (default: True). Hierarchical SBM or Flat SBM.
-            Flat SBM not implemented yet.
-        - Bmin, int (default:None): pass an option to the graph-tool inference specifying the minimum number of blocks.
         - n_init, int (default:1): number of different initial conditions to run in order to avoid local minimum of MDL.
         '''
-
-        sequential = not parallel
-
         g = self.g
         if g is None:
             print('No data to fit the SBM. Load some data first (make_graph)')
@@ -254,35 +230,33 @@ class sbmtm():
                 state_args["eweight"] = g.ep.count
 
             ## the inference
-            mdl = np.inf  ##
+            mdl = np.inf ##
             for i_n_init in range(n_init):
+                base_type = gt.BlockState if not overlap else gt.OverlapBlockState
                 state_tmp = gt.minimize_nested_blockmodel_dl(g,
-                                                             deg_corr=True,
-                                                             overlap=overlap,
-                                                             state_args=state_args,
-                                                             mcmc_args={'sequential': sequential},
-                                                             mcmc_equilibrate_args={
-                                                                 'mcmc_args': {'sequential': sequential}},
-                                                             mcmc_multilevel_args={
-                                                                 'mcmc_equilibrate_args': {
-                                                                     'mcmc_args': {'sequential': sequential}
-                                                                 },
-                                                                 'anneal_args': {
-                                                                     'mcmc_equilibrate_args': {
-                                                                         'mcmc_args': {'sequential': sequential}
-                                                                     }
-                                                                 }
-                                                             },
-                                                             B_min=B_min,
-                                                             B_max=B_max,
-                                                             verbose=verbose
-                                                             )
+                                                             state_args=dict(
+                                                                 base_type=base_type,
+                                                                 **state_args),
+                                                             multilevel_mcmc_args=dict(
+                                                                 verbose=verbose))
+                L = 0
+                for s in state_tmp.levels:
+                    L += 1
+                    if s.get_nonempty_B() == 2:
+                        break
+                state_tmp = state_tmp.copy(bs=state_tmp.get_bs()[:L] + [np.zeros(1)])
+                # state_tmp = state_tmp.copy(sampling=True)
+                # delta = 1 + epsilon
+                # while abs(delta) > epsilon:
+                #     delta = state_tmp.multiflip_mcmc_sweep(niter=10, beta=np.inf)[0]
+                #     print(delta)
+                print(state_tmp)
+
                 mdl_tmp = state_tmp.entropy()
                 if mdl_tmp < mdl:
-                    mdl = 1.0 * mdl_tmp
+                    mdl = 1.0*mdl_tmp
                     state = state_tmp.copy()
 
-            self.mdl = mdl
             self.state = state
             ## minimum description length
             self.mdl = state.entropy()
@@ -291,73 +265,6 @@ class sbmtm():
                 self.L = 1
             else:
                 self.L = L-2
-
-            ## do not calculate group memberships right away -- matrices are too large
-
-            ## collect group membership for each level in the hierarchy
-
-            # dict_groups_L = {}
-
-            # ## only trivial bipartite structure
-            # if L == 2:
-            #     self.L = 1
-            #     for l in range(L-1):
-            #         dict_groups_l = self.get_groups(l=l)
-            #         dict_groups_L[l] = dict_groups_l
-            # ## omit trivial levels: l=L-1 (single group), l=L-2 (bipartite)
-            # else:
-            #     self.L = L-2
-            #     for l in range(L-2):
-            #         dict_groups_l = self.get_groups(l=l)
-            #         dict_groups_L[l] = dict_groups_l
-            # self.groups = dict_groups_L
-
-    def multiflip_mcmc_sweep(self, n_steps=1000, beta=np.inf, niter=10, verbose=True):
-        '''
-        Fit the sbm to the word-document network. Use multtiplip_mcmc_sweep
-        - n_steps, int (default:1): number of steps.
-        '''
-        g = self.g
-        if g is None:
-            print('No data to fit the SBM. Load some data first (make_graph)')
-        else:
-            clabel = g.vp['kind']
-
-            state_args = {'clabel': clabel, 'pclabel': clabel}
-            if "count" in g.ep:
-                state_args["eweight"] = g.ep.count
-
-        state = self.state
-        if state is not None:
-            state = state.copy(bs=state.get_bs() + [np.zeros(1)] * 4,sampling = True)
-        else:
-            state = gt.NestedBlockState(g)
-
-        for step in range(n_steps): # this should be sufficiently large
-          if verbose:
-              print(f"step: {step}")
-          state.multiflip_mcmc_sweep(beta=beta, niter=niter)
-
-        self.state = state
-        ## minimum description length
-        self.mdl = self.state.entropy()
-        ## collect group membership for each level in the hierarchy
-        L = len(state.levels)
-        dict_groups_L = {}
-
-        ## only trivial bipartite structure
-        if L == 2:
-            self.L = 1
-            for l in range(L-1):
-                dict_groups_l = self.get_groups(l=l)
-                dict_groups_L[l] = dict_groups_l
-        ## omit trivial levels: l=L-1 (single group), l=L-2 (bipartite)
-        else:
-            self.L = L-2
-            for l in range(L-2):
-                dict_groups_l = self.get_groups(l=l)
-                dict_groups_L[l] = dict_groups_l
-        self.groups = dict_groups_L
 
 
     def plot(self, filename = None,nedges = 1000):
@@ -565,10 +472,6 @@ class sbmtm():
     ########### HELPER FUNCTIONS
     ###########
     ## get group-topic statistics
-
-    def get_mdl(self):
-        return self.mdl
-
     def get_groups(self,l=0):
         '''
         extract statistics on group membership of nodes form the inferred state.
@@ -596,7 +499,7 @@ class sbmtm():
         counts = 'count' in self.g.ep.keys()
 
         ## count labeled half-edges, group-memberships
-        B = state_l.B
+        B = state_l.get_B()
         n_wb = np.zeros((V,B)) ## number of half-edges incident on word-node w and labeled as word-group tw
         n_db = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as document-group td
         n_dbw = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as word-group td
@@ -679,7 +582,7 @@ class sbmtm():
         state_l_edges = state_l.get_edge_blocks() ## labeled half-edges
 
         ## count labeled half-edges, group-memberships
-        B = state_l.B
+        B = state_l.get_B()
         n_td_tw = np.zeros((B,B))
 
         counts = 'count' in self.g.ep.keys()
@@ -738,7 +641,7 @@ class sbmtm():
             self.state.print_summary()
 
     def plot_topic_dist(self, l):
-        groups = self.get_groups(l)
+        groups = self.groups[l]
         p_w_tw = groups['p_w_tw']
         fig=plt.figure(figsize=(12,10))
         plt.imshow(p_w_tw,origin='lower',aspect='auto',interpolation='none')
