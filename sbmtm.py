@@ -210,14 +210,11 @@ class sbmtm():
         self.documents = [ self.g.vp['name'][v] for v in  self.g.vertices() if self.g.vp['kind'][v]==0   ]
 
 
-    def fit(self,overlap = False, hierarchical = True, B_min = None, n_init = 1,verbose=False):
+    def fit(self,overlap = False, n_init = 1, verbose=False, epsilon=1e-3):
         '''
         Fit the sbm to the word-document network.
         - overlap, bool (default: False). Overlapping or Non-overlapping groups.
             Overlapping not implemented yet
-        - hierarchical, bool (default: True). Hierarchical SBM or Flat SBM.
-            Flat SBM not implemented yet.
-        - Bmin, int (default:None): pass an option to the graph-tool inference specifying the minimum number of blocks.
         - n_init, int (default:1): number of different initial conditions to run in order to avoid local minimum of MDL.
         '''
         g = self.g
@@ -235,11 +232,26 @@ class sbmtm():
             ## the inference
             mdl = np.inf ##
             for i_n_init in range(n_init):
-                state_tmp = gt.minimize_nested_blockmodel_dl(g, deg_corr=True,
-                                                     overlap=overlap,
-                                                     state_args=state_args,
-                                                     B_min = B_min,
-                                                     verbose=verbose)
+                base_type = gt.BlockState if not overlap else gt.OverlapBlockState
+                state_tmp = gt.minimize_nested_blockmodel_dl(g,
+                                                             state_args=dict(
+                                                                 base_type=base_type,
+                                                                 **state_args),
+                                                             multilevel_mcmc_args=dict(
+                                                                 verbose=verbose))
+                L = 0
+                for s in state_tmp.levels:
+                    L += 1
+                    if s.get_nonempty_B() == 2:
+                        break
+                state_tmp = state_tmp.copy(bs=state_tmp.get_bs()[:L] + [np.zeros(1)])
+                # state_tmp = state_tmp.copy(sampling=True)
+                # delta = 1 + epsilon
+                # while abs(delta) > epsilon:
+                #     delta = state_tmp.multiflip_mcmc_sweep(niter=10, beta=np.inf)[0]
+                #     print(delta)
+                print(state_tmp)
+
                 mdl_tmp = state_tmp.entropy()
                 if mdl_tmp < mdl:
                     mdl = 1.0*mdl_tmp
@@ -254,25 +266,6 @@ class sbmtm():
             else:
                 self.L = L-2
 
-            ## do not calculate group memberships right away -- matrices are too large
-
-            ## collect group membership for each level in the hierarchy
-
-            # dict_groups_L = {}
-
-            # ## only trivial bipartite structure
-            # if L == 2:
-            #     self.L = 1
-            #     for l in range(L-1):
-            #         dict_groups_l = self.get_groups(l=l)
-            #         dict_groups_L[l] = dict_groups_l
-            # ## omit trivial levels: l=L-1 (single group), l=L-2 (bipartite)
-            # else:
-            #     self.L = L-2
-            #     for l in range(L-2):
-            #         dict_groups_l = self.get_groups(l=l)
-            #         dict_groups_L[l] = dict_groups_l
-            # self.groups = dict_groups_L
 
     def plot(self, filename = None,nedges = 1000):
         '''
@@ -506,7 +499,7 @@ class sbmtm():
         counts = 'count' in self.g.ep.keys()
 
         ## count labeled half-edges, group-memberships
-        B = state_l.B
+        B = state_l.get_B()
         n_wb = np.zeros((V,B)) ## number of half-edges incident on word-node w and labeled as word-group tw
         n_db = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as document-group td
         n_dbw = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as word-group td
@@ -589,7 +582,7 @@ class sbmtm():
         state_l_edges = state_l.get_edge_blocks() ## labeled half-edges
 
         ## count labeled half-edges, group-memberships
-        B = state_l.B
+        B = state_l.get_B()
         n_td_tw = np.zeros((B,B))
 
         counts = 'count' in self.g.ep.keys()
