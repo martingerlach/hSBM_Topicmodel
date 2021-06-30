@@ -4,6 +4,7 @@ A tutorial for topic-modeling with hierarchical stochastic blockmodels using gra
 
 Based on the works in:
 - Gerlach, M., Peixoto, T. P., & Altmann, E. G. (2018). A network approach to topic models. Science Advances, 4(7), eaaq1360. https://doi.org/10.1126/sciadv.aaq1360
+- C. C. Hyland, Y. Tao, L. Azizi, M. Gerlach, T. P. Peixoto, and E. G. Altmann Multilayer Networks for Text Analysis with Multiple Data Types , EPJ Data Science 10, 33 (2021). https://epjdatascience.springeropen.com/articles/10.1140/epjds/s13688-021-00288-5
 
 
 ## Setup
