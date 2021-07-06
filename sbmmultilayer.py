@@ -16,8 +16,8 @@ from collections import Counter,defaultdict
 
 class sbmmultilayer:
     """
-    Topic modelling using Hierarchical Multilayer Stochastic Block Model. The 
-    model is an implementatino of a 2-layer multilayer SBM where the first layer 
+    Topic modelling using Hierarchical Multilayer Stochastic Block Model. The
+    model is an implementatino of a 2-layer multilayer SBM where the first layer
     is a bipartite network between documents and word-types based off the TopSBM
     formulation. The second layer is a hyperlink network between the documents.
 
@@ -60,16 +60,16 @@ class sbmmultilayer:
         self.mdl = np.nan
         self.n_levels = np.nan
 
-        
+
     def make_graph(self, list_texts, list_titles, list_hyperlinks):
         """
         Load a corpus and generate the multilayered network where one layer
         is the multigraph word-document bipartite network and another is the document
         hyperlink network.
-        
-        Document node will be given be the number 0 and word nodes will be 
+
+        Document node will be given be the number 0 and word nodes will be
         given the number 1.
-        
+
         Parameters
         ----------
         list_texts : type
@@ -97,12 +97,12 @@ class sbmmultilayer:
         # Documents nodes (0), word nodes (1)
         kind = g.vp["kind"] = g.new_vp("int")
         # Specify Vertex Layers: word node: [0]; doc node: [0, 1]
-        vlayers = g.vp["vlayers"] = g.new_vp("vector<int>")        
+        vlayers = g.vp["vlayers"] = g.new_vp("vector<int>")
 
         #### Define edge properties ####
-        # Edge multiplicity 
+        # Edge multiplicity
         edgeCount = g.ep["edgeCount"] = g.new_ep("int")
-        
+
         # Need to specify edgetype to indicate which layer an edge is in
         # Hyperlink edge (1) and doc-word edge (0)
         edgeType = g.ep["edgeType"] = g.new_ep("int")
@@ -124,7 +124,7 @@ class sbmmultilayer:
             t = doc_vertices[pair[1]]
             e = g.add_edge(s, t)
             edgeCount[e] = 1
-            edgeType[e] = 1 # Indicates the edge is hyperlink            
+            edgeType[e] = 1 # Indicates the edge is hyperlink
 
         #### Construct bipartite word-doc graph ####
         # Create edges between documents and words
@@ -143,7 +143,7 @@ class sbmmultilayer:
                 e = g.add_edge(d, w) # add link between document and word node
                 edgeCount[e] = count # assign weighting to edge based on number of occurrences
                 edgeType[e] = 0 # to indicate the edge is word occurrence
-        
+
         # Initialise words and documents network to model.
         self.g = g
         self.words = [ g.vp['name'][v] for v in  g.vertices() if g.vp['kind'][v]==1   ]
@@ -158,27 +158,27 @@ class sbmmultilayer:
         # We need to impose constraints on vertices and edges to keep track which layer are they in.
         state_args = {}
         # Vertices with different label values will not be clustered in the same group
-        state_args["clabel"] = self.g.vp["kind"]
-        # Used to compute the partition description length
         state_args["pclabel"] = self.g.vp["kind"]
         # Split the network in discrete layers based on edgetype. 0 is for word-doc graph and 1 is for hyperlink graph.
-        state_args["ec"] = self.g.ep["edgeType"]        
+        state_args["ec"] = self.g.ep["edgeType"]
         # Independent layers version of the model (instead of 'edge covariates')
         state_args["layers"] = True
         # Edge multiplicities based on occurrences.
         state_args["eweight"] = self.g.ep.edgeCount
 
+        self.g.save("foo.gt.gz")
         # Specify parameters for community detection inference
         gt.seed_rng(self.random_seed)
         mdl = np.inf
         # Fit n_init random initializations to avoid local optimum of MDL.
         for _ in range(self.n_init):
             # Enables the use of LayeredBlockState. Use a degree-corrected layered SBM.
-            state_temp = gt.minimize_nested_blockmodel_dl(self.g, deg_corr=True, layers = True, state_args=state_args)
+            state_temp = gt.minimize_nested_blockmodel_dl(self.g, state_args=dict(base_type=gt.LayeredBlockState,
+                                                                                  **state_args))
             mdl_temp = state_temp.entropy()
             if mdl_temp < mdl:
-                # We have found new optima.
-                mdl = 1.0 * mdl_temp
+                # We have found a new optimum
+                mdl = mdl_temp
                 state = state_temp.copy()
 
         self.state = state
@@ -236,10 +236,10 @@ class sbmmultilayer:
         # Retrieve the number of blocks
         # Project the partition at level l onto the lowest level and return the corresponding state.
         state_l = state.project_level(l).agg_state.copy(overlap=True)
-        B = state_l.B # number of blocks
+        B = state_l.get_B() # number of blocks
 
         # Returns an edge property map which contains the block labels pairs for each edge.
-        # Note that in the text network, one endpoint will be in doc blocks and other endpoint 
+        # Note that in the text network, one endpoint will be in doc blocks and other endpoint
         # will be in word type block
         state_l_edges = state_l.get_edge_blocks()
 
@@ -257,7 +257,7 @@ class sbmmultilayer:
         for e in g.edges():
             # We only care about edges in text network
             if g.ep.edgeType[e] == 0:
-                # z1 will have values from 1, 2, ..., B_d; document-group i.e document block that doc node is in 
+                # z1 will have values from 1, 2, ..., B_d; document-group i.e document block that doc node is in
                 # z2 will have values from B_d + 1, B_d + 2,  ..., B_d + B_w; word-group i.e word block that word type node is in
                 z1, z2 = state_l_edges[e]
                 # v1 ranges from 0, 1, 2, ..., D - 1
@@ -322,7 +322,7 @@ class sbmmultilayer:
             dict_group_words[tw] = list_words_tw
         return dict_group_words
 
-    
+
     def get_topicProportion(self, doc_index, l=0):
         '''
         Get the topic proportion for a particular document
@@ -334,7 +334,7 @@ class sbmmultilayer:
             list_topics_tw += [(tw,p_tw)]
         return list_topics_tw
 
-    
+
     def get_docclusters(self,l=0,n=10):
         '''
         Get n 'most common' documents from each document cluster.
@@ -360,7 +360,7 @@ class sbmmultilayer:
             dict_group_docs[td] = list_docs_td
         return dict_group_docs
 
-    
+
     def clusters_query(self,doc_index,l=0):
         '''
         Get all documents in the same group as the query-document.
