@@ -486,6 +486,7 @@ class sbmtm():
              prob of word w given topic tw P(w | tw)
         - p_tw_d, array B_w x d; doc-topic mixtures:
              prob of word-group tw in doc d P(tw | d)
+        - label_map, array of size N; map from group labels to indexes in the above arrays
         '''
         V = self.get_V()
         D = self.get_D()
@@ -499,13 +500,22 @@ class sbmtm():
         counts = 'count' in self.g.ep.keys()
 
         ## count labeled half-edges, group-memberships
-        B = state_l.get_B()
+        B = state_l.get_nonempty_B()
+        label_map = np.zeros((state_l.get_B()), dtype="int")
+        pos = 0
+        for r in range(len(state_l.wr.fa)):
+            if state_l.wr[r] > 0:
+                label_map[r] = pos
+                pos += 1
+
         n_wb = np.zeros((V,B)) ## number of half-edges incident on word-node w and labeled as word-group tw
         n_db = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as document-group td
         n_dbw = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as word-group td
 
         for e in g.edges():
             z1,z2 = state_l_edges[e]
+            z1 = label_map[z1]
+            z2 = label_map[z2]
             v1 = e.source()
             v2 = e.target()
             if counts:
@@ -550,6 +560,7 @@ class sbmtm():
         result['p_td_d'] = p_td_d
         result['p_w_tw'] = p_w_tw
         result['p_tw_d'] = p_tw_d
+        result['label_map'] = label_map
 
         return result
 
