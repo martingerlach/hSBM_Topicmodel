@@ -495,36 +495,34 @@ class sbmtm():
         g = self.g
         state = self.state
         state_l = state.project_level(l).copy(overlap=True)
+
+        b = gt.contiguous_map(state_l.b)
+        label_map = {}
+        for v in g.vertices():
+            label_map[state_l.b[v]] = b[v]
+        state_l = state_l.copy(b=b)
+
         state_l_edges = state_l.get_edge_blocks() ## labeled half-edges
 
         counts = 'count' in self.g.ep.keys()
 
         ## count labeled half-edges, group-memberships
         B = state_l.get_nonempty_B()
-        label_map = np.zeros((state_l.get_B()), dtype="int")
-        pos = 0
-        for r in range(len(state_l.wr.fa)):
-            if state_l.wr[r] > 0:
-                label_map[r] = pos
-                pos += 1
 
-        n_wb = np.zeros((V,B)) ## number of half-edges incident on word-node w and labeled as word-group tw
-        n_db = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as document-group td
+        n_wb = np.zeros((V,B))  ## number of half-edges incident on word-node w and labeled as word-group tw
+        n_db = np.zeros((D,B))  ## number of half-edges incident on document-node d and labeled as document-group td
         n_dbw = np.zeros((D,B)) ## number of half-edges incident on document-node d and labeled as word-group td
 
-        for e in g.edges():
-            z1,z2 = state_l_edges[e]
-            z1 = label_map[z1]
-            z2 = label_map[z2]
-            v1 = e.source()
-            v2 = e.target()
-            if counts:
-                weight = g.ep["count"][e]
-            else:
-                weight = 1
-            n_db[int(v1), z1] += weight
-            n_dbw[int(v1), z2] += weight
-            n_wb[int(v2) - D, z2] += weight
+        if counts:
+            eweight = g.ep["count"]
+        else:
+            eweight = g.new_ep("int", 1)
+
+        ze = gt.ungroup_vector_property(state_l_edges, [0,1])
+        for v1, v2, z1, z2, w in g.get_edges([ze[0], ze[1], eweight]):
+            n_db[v1, z1] += w
+            n_dbw[v1, z2] += w
+            n_wb[v2 - D, z2] += w
 
         p_w = np.sum(n_wb,axis=1)/float(np.sum(n_wb))
 
