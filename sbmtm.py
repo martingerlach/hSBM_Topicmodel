@@ -266,6 +266,19 @@ class sbmtm():
             else:
                 self.L = L-2
 
+    def save_model(self, path):
+        '''Save the trained model in the specified path as a pickle'''
+        if '.pickle' not in path:
+            path += '.pickle'
+        with open(path, 'wb') as f:
+            pickle.dump(self, f)
+        
+    def load_model(self, path):
+        '''Load the trained model from the specified path to the pickle file'''
+        if '.pickle' not in path:
+            path += '.pickle'
+        with open(path, 'rb') as f:
+            return pickle.load(f)
 
     def plot(self, filename=None, nedges=1000, hide_h=0, h_v_size=5.0, h_e_size=1.0, **kwargs):
         '''
