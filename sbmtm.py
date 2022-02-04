@@ -278,7 +278,9 @@ class sbmtm():
         if '.pickle' not in path:
             path += '.pickle'
         with open(path, 'rb') as f:
-            return pickle.load(f)
+            obj = pickle.load(f)
+            self.__dict__.update(obj.__dict__)
+            #return pickle.load(f)
 
     def plot(self, filename=None, nedges=1000, hide_h=0, h_v_size=5.0, h_e_size=1.0, **kwargs):
         '''
