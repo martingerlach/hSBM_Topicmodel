@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from collections import Counter,defaultdict
 import pickle
 import graph_tool.all as gt
-
+from contextlib import redirect_stdout
 
 class sbmtm():
     '''
@@ -661,17 +661,14 @@ class sbmtm():
         return pmi_td_tw
 
 
-    def print_summary(self, tofile=True):
+    def print_summary(self, file=None):
         '''
         Print hierarchy summary
         '''
-        if tofile:
-            orig_stdout = sys.stdout
-            f = open('summary.txt', 'w')
-            sys.stdout = f
-            self.state.print_summary()
-            sys.stdout = orig_stdout
-            f.close()
+        if file:
+            with open(file, 'w') as f:
+                with redirect_stdout(f):
+                    self.state.print_summary()
         else:
             self.state.print_summary()
 
