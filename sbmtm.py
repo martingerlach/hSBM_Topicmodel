@@ -643,6 +643,27 @@ class sbmtm():
 
         return result
 
+    def search_consensus(self, force_niter=100000, niter=100):
+        # collect nested partitions
+        bs = []
+
+        def collect_partitions(s):
+            bs.append(s.get_bs())
+
+        # Now we collect the marginals for exactly niter sweeps
+        gt.mcmc_equilibrate(self.state, force_niter=force_niter, mcmc_args=dict(niter=niter),
+                            callback=collect_partitions)
+
+        # Disambiguate partitions and obtain marginals
+        pmode = gt.PartitionModeState(bs, nested=True, converge=True)
+        pv = pmode.get_marginal(self.g)
+
+        # Get consensus estimate
+        bs = pmode.get_max_nested()
+        self.state = self.state.copy(bs=bs)
+        
+        return pv
+
     ### helper functions
 
     def get_V(self):
