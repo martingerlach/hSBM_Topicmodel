@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from collections import Counter,defaultdict
 import pickle
 import graph_tool.all as gt
-
+from contextlib import redirect_stdout
 
 class sbmtm():
     '''
@@ -266,16 +266,42 @@ class sbmtm():
             else:
                 self.L = L-2
 
+    def save_model(self, path):
+        '''
+        Save the trained model in the specified path as a pickle
+        '''
+        if '.pickle' not in path:
+            path += '.pickle'
+        with open(path, 'wb') as f:
+            pickle.dump(self, f)
+        
+    def load_model(self, path):
+        '''
+        Load the trained model from the specified path to the pickle file
+        '''
+        if '.pickle' not in path:
+            path += '.pickle'
+        with open(path, 'rb') as f:
+            obj = pickle.load(f)
+            self.__dict__.update(obj.__dict__)
 
-    def plot(self, filename = None,nedges = 1000):
+    def plot(self, filename=None, nedges=1000, hide_h=0, h_v_size=5.0, h_e_size=1.0, **kwargs):
         '''
         Plot the graph and group structure.
         optional:
         - filename, str; where to save the plot. if None, will not be saved
         - nedges, int; subsample  to plot (faster, less memory)
+        - hide_h, int; wether or not to hide the hierarchy
+        - h_v_size, float; size of hierarchical vertices
+        - h_e_size, float; size of hierarchical edges
+        - **kwargs; keyword arguments passed to self.state.draw method (https://graph-tool.skewed.de/static/doc/draw.html#graph_tool.draw.draw_hierarchy)
         '''
         self.state.draw(layout='bipartite', output=filename,
-                        subsample_edges=nedges, hshortcuts=1, hide=0)
+                        subsample_edges=nedges, hshortcuts=1, hide=hide_h,
+                        hvprops={'size':h_v_size},
+                        heprops={'pen_width':h_e_size},
+                        **kwargs,
+                       )
 
 
     def topics(self, l=0, n=10):
@@ -635,17 +661,14 @@ class sbmtm():
         return pmi_td_tw
 
 
-    def print_summary(self, tofile=True):
+    def print_summary(self, file=None):
         '''
         Print hierarchy summary
         '''
-        if tofile:
-            orig_stdout = sys.stdout
-            f = open('summary.txt', 'w')
-            sys.stdout = f
-            self.state.print_summary()
-            sys.stdout = orig_stdout
-            f.close()
+        if file:
+            with open(file, 'w') as f:
+                with redirect_stdout(f):
+                    self.state.print_summary()
         else:
             self.state.print_summary()
 
