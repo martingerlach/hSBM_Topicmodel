@@ -16,7 +16,7 @@ class sbmtm():
     def __init__(self):
         self.g = None ## network
 
-        self.words = [] ## list of word nodes
+        self.words = [] ## list of word nodeso
         self.documents = [] ## list of document nodes
 
         self.state = None ## inference state from graphtool
@@ -331,6 +331,7 @@ class sbmtm():
             dict_group_words[tw] = list_words_tw
         return dict_group_words
 
+
     def topicdist(self, doc_index, l=0):
         # dict_groups =  self.groups[l]
         dict_groups = self.get_groups(l=l)
@@ -341,6 +342,40 @@ class sbmtm():
                 list_topics_tw += [(tw,p_tw)]
         return list_topics_tw
 
+
+    def topicdist_relative(self,doc_index=-1,l=0):
+        ''' Relative appearance of topic in a document. Positive (negative) values indicate larger (smaller) representation of the topic in the document, relative to the othere documents. Eq. (10) from Hyland et al. '''
+        
+        dict_groups = self.get_groups(l=l)
+        n_dbw = dict_groups['n_dbw']
+        p_tw_d = dict_groups['p_tw_d']
+        p_td_d = dict_groups['p_td_d']
+        
+        avgf_tw = np.sum(n_dbw,axis=0)/np.sum(n_dbw)
+        tau_d = (p_tw_d.T - avgf_tw)/avgf_tw
+        
+        # Return single document result, if doc_index is given; Otherwise, return results for all documents
+        if doc_index>=0:
+            print(tau_d[doc_index])
+        else:
+            return tau_d
+
+    def docs_of_topic(self,l=0,n=5):
+        ''' Return the n-documents with the largest (relative) association with the topic. Positive values indicate the extent of over-representation. '''
+
+        tau_d=self.topicdist_relative(l=l)
+                
+        for i in range(len(tau_d[0])):
+            print("\nTopic "+str(i)) 
+            results=[]
+            indn=np.argpartition(tau_d[:,i],-n)[-n:] #indices of top n documents
+            for j in indn:
+                results.append([tau_d[j,i],self.documents[j]])
+            results.sort()
+            results.reverse()
+            for m in range(len(results)):
+                print(results[m])
+    
     def clusters(self,l=0,n=10):
         '''
         Get n 'most common' documents from each document cluster.
@@ -584,6 +619,7 @@ class sbmtm():
         result['p_td_d'] = p_td_d
         result['p_w_tw'] = p_w_tw
         result['p_tw_d'] = p_tw_d
+        result['n_dbw'] = n_dbw
         result['label_map'] = label_map
 
         return result
@@ -671,6 +707,21 @@ class sbmtm():
                     self.state.print_summary()
         else:
             self.state.print_summary()
+
+    def print_overview(self, file=None):
+        '''
+        Print hierarchy summary
+        '''
+        out=""
+        for l in range(len(self.state.get_levels())-1):
+            x=self.get_groups(l)
+            out=out+("Level "+str(l)+" has "+str(x["Bd"])+" document groups and "+str(x["Bw"])+" topics (word groups)\n")
+        if file:
+            with open(file, 'w') as f:
+                with redirect_stdout(f):
+                    print(out)
+        else:
+            print(out)
 
     def plot_topic_dist(self, l):
         #groups = self.groups[l]
