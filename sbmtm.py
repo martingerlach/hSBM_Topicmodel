@@ -412,6 +412,8 @@ class sbmtm():
         dict_groups = self.get_groups(l=l)
         Bd = dict_groups['Bd']
         p_td_d = dict_groups['p_td_d']
+        if n<0:
+            n = len(p_td_d[0])
 
         docs = self.documents
         ## loop over all word-groups
@@ -752,7 +754,7 @@ class sbmtm():
             self.state.print_summary()
 
     def plot_topic_dist(self, l):
-        groups = self.groups[l]
+        groups = self.get_groups(l)
         p_w_tw = groups['p_w_tw']
         fig=plt.figure(figsize=(12,10))
         plt.imshow(p_w_tw,origin='lower',aspect='auto',interpolation='none')
