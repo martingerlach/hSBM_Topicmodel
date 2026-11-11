@@ -242,7 +242,7 @@ class sbmtm():
                 L = 0
                 for s in state_tmp.levels:
                     L += 1
-                    if s.get_nonempty_B() == 2:
+                    if s.get_B() == 2:
                         break
                 state_tmp = state_tmp.copy(bs=state_tmp.get_bs()[:L] + [np.zeros(1)])
                 # state_tmp = state_tmp.copy(sampling=True)
@@ -520,7 +520,7 @@ class sbmtm():
 
         g = self.g
         state = self.state
-        state_l = state.project_level(l).copy(overlap=True)
+        state_l = state.project_level(l)
 
         b = gt.contiguous_map(state_l.b)
         label_map = {}
@@ -528,12 +528,13 @@ class sbmtm():
             label_map[state_l.b[v]] = b[v]
         state_l = state_l.copy(b=b)
 
-        state_l_edges = state_l.get_edge_blocks() ## labeled half-edges
+        state_l_edges = gt.group_vector_property([gt.edge_endpoint_property(g, state_l.b, "source"),
+                                                  gt.edge_endpoint_property(g, state_l.b, "target")]) ## labeled half-edges
 
         counts = 'count' in self.g.ep.keys()
 
         ## count labeled half-edges, group-memberships
-        B = state_l.get_nonempty_B()
+        B = state_l.get_B()
 
         n_wb = np.zeros((V,B))  ## number of half-edges incident on word-node w and labeled as word-group tw
         n_db = np.zeros((D,B))  ## number of half-edges incident on document-node d and labeled as document-group td
@@ -613,8 +614,10 @@ class sbmtm():
 
         g = self.g
         state = self.state
-        state_l = state.project_level(l).copy(overlap=True)
-        state_l_edges = state_l.get_edge_blocks() ## labeled half-edges
+        state_l = state.project_level(l)
+        state_l = state_l.copy(b=gt.contiguous_map(state_l.b))
+        state_l_edges = gt.group_vector_property([gt.edge_endpoint_property(g, state_l.b, "source"),
+                                                  gt.edge_endpoint_property(g, state_l.b, "target")]) ## labeled half-edges
 
         ## count labeled half-edges, group-memberships
         B = state_l.get_B()
